@@ -37,3 +37,26 @@ Are you a developer? Pull requests are welcome! If you find a bug and fix it you
 You're all set. Enjoy!
 
 Many thanks for using our simulator! We hope you like it.
+
+## Alert Test Triggers
+
+You can now force alert tests without waiting for live data, including Quebec En Alerte-style government/public safety alerts.
+
+1. Configure default behavior in `webroot/js/config.js` with `alertTestSettings`.
+2. Use URL parameters:
+	- `?alertTest=tornado`
+	- `?alertTest=all`
+	- `?alertTest=quebec`
+	- `?alertTestCrawl=false` (optional)
+3. Use browser console commands at runtime:
+	- `alertTest.trigger('tornado')`
+	- `alertTest.trigger('Alerte de tornade')`
+	- `alertTest.triggerAll()`
+	- `alertTest.triggerQuebec()`
+	- `alertTest.listTypes()`
+	- `alertTest.clear()`
+4. Use the Settings UI "Alert Test" controls:
+	- Pick a disaster type and click **Run**
+	- Click **All** to run all disaster test types
+	- Click **Quebec** for Quebec En Alerte (government/public safety, including AMBER-style) test set
+	- Click **Clear** to return to live alerts

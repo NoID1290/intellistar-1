@@ -80,3 +80,10 @@ var locationSettings = {
         regional: []
     }
 }
+
+var alertTestSettings = {
+    enabled: false,
+    mode: "off", // off | single | all | quebec
+    disasterType: "tornado", // alias or full alert name when mode is "single"
+    includeCrawl: true // when true, severe alerts trigger the crawl + tones
+}

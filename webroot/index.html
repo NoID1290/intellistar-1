@@ -695,6 +695,34 @@
                     <div>Obs</div>
                 </button>
             </div>
+            <div class="alerttests changecolor" style="color: #171717;">
+                <div class="alerttesttext">Alert Test:</div>
+                <select id="alerttesttype">
+                    <option value="tornado">Tornado Warning</option>
+                    <option value="severe-thunderstorm">Severe Thunderstorm Warning</option>
+                    <option value="flash-flood">Flash Flood Warning</option>
+                    <option value="hurricane">Hurricane Warning</option>
+                    <option value="blizzard">Blizzard Warning</option>
+                    <option value="winter-storm">Winter Storm Warning</option>
+                    <option value="fire">Fire Warning</option>
+                    <option value="earthquake">Earthquake Warning</option>
+                    <option value="volcano">Volcano Warning</option>
+                    <option value="ashfall">Ashfall Warning</option>
+                </select>
+                <button id="alerttesttrigger" class="alerttestbutton">
+                    <div>Run</div>
+                </button>
+                <button id="alerttestall" class="alerttestbutton">
+                    <div>All</div>
+                </button>
+                <button id="alerttestquebec" class="alerttestbutton">
+                    <div>Quebec</div>
+                </button>
+                <button id="alerttestclear" class="alerttestbutton">
+                    <div>Clear</div>
+                </button>
+                <div class="alertteststatus" style="display: none;"></div>
+            </div>
             <button id="startbutton" onclick="startProgram()"
             style="pointer-events: none; opacity: 0.5;">Start</button>
             <h3 id="promo" class="changecolor" style="color: #171717;">Created by</h3>

@@ -678,6 +678,13 @@ var codetoFcst = {
 }
 var warningSettings = {
 		"Tsunami Warning": {priority:1, severe:false, color: 'red', included:true, marine:false},
+        "AMBER Alert": {priority:1.1, severe:true, color: 'red', included:true, marine:false},
+        "Alerte AMBER": {priority:1.1, severe:true, color: 'red', included:true, marine:false},
+        "Civil Emergency Message": {priority:1.2, severe:true, color: 'red', included:true, marine:false},
+        "Alerte d'urgence civile": {priority:1.2, severe:true, color: 'red', included:true, marine:false},
+        "Evacuation Immediate": {priority:1.3, severe:true, color: 'red', included:true, marine:false},
+        "Shelter In Place Warning": {priority:1.4, severe:true, color: 'red', included:true, marine:false},
+        "911 Telephone Outage Emergency": {priority:1.5, severe:true, color: 'red', included:true, marine:false},
 		"Tornado Warning": {priority:2, severe:true, color: 'red', included:true, marine:false},
 		"Alerte de tornade": {priority:2, severe:true, color: 'red', included:true, marine:false},
 		"Extreme Wind Warning": {priority:3, severe:false, color: 'red', included:false, marine:false},

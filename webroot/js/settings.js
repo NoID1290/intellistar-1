@@ -1,4 +1,50 @@
 var inSettings = true;
+
+function setAlertTestStatus(message, isError) {
+    var status = document.querySelector(".alertteststatus");
+    if (!status) {
+        return;
+    }
+    status.textContent = message;
+    status.style.color = isError ? "#8a0000" : "#0b5f00";
+    status.style.display = "block";
+    setTimeout(() => {
+        status.style.display = "none";
+    }, 2200);
+}
+
+async function runAlertTestFromUI(mode) {
+    if (!window.alertTest) {
+        setAlertTestStatus("Alert testing unavailable.", true);
+        return;
+    }
+
+    if (mode === "single") {
+        var picker = document.getElementById("alerttesttype");
+        var picked = picker ? picker.value : "tornado";
+        var ok = await window.alertTest.trigger(picked);
+        setAlertTestStatus(ok ? `Ran test: ${picked}` : "Unknown alert test type.", !ok);
+        return;
+    }
+
+    if (mode === "all") {
+        await window.alertTest.triggerAll();
+        setAlertTestStatus("Ran all disaster alert tests.", false);
+        return;
+    }
+
+    if (mode === "quebec") {
+        await window.alertTest.triggerQuebec();
+        setAlertTestStatus("Ran Quebec en Alerte test.", false);
+        return;
+    }
+
+    if (mode === "clear") {
+        await window.alertTest.clear();
+        setAlertTestStatus("Cleared alert test mode.", false);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () =>{
     $("#settings-menu .version").text(`v${appearanceSettings.version}`);
     $("#settings-menu .flavortext").text("Flavor: " + slideSettings.flavor + "s");
@@ -110,6 +156,23 @@ document.addEventListener('DOMContentLoaded', async () =>{
         .addEventListener("click", () => {
             mapSettings();
         })
+
+    var alertRunBtn = document.getElementById("alerttesttrigger");
+    var alertAllBtn = document.getElementById("alerttestall");
+    var alertQuebecBtn = document.getElementById("alerttestquebec");
+    var alertClearBtn = document.getElementById("alerttestclear");
+    if (alertRunBtn) {
+        alertRunBtn.addEventListener("click", () => runAlertTestFromUI("single"));
+    }
+    if (alertAllBtn) {
+        alertAllBtn.addEventListener("click", () => runAlertTestFromUI("all"));
+    }
+    if (alertQuebecBtn) {
+        alertQuebecBtn.addEventListener("click", () => runAlertTestFromUI("quebec"));
+    }
+    if (alertClearBtn) {
+        alertClearBtn.addEventListener("click", () => runAlertTestFromUI("clear"));
+    }
 
     // IPTV mode: auto-start without showing settings menu
     if (window.location.search.includes('iptv')) {

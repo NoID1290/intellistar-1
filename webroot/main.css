@@ -233,6 +233,15 @@ body, html {
 #settings-menu .ldloption {
     margin-top: 350px;
 }
+#settings-menu .alerttests {
+    position: absolute;
+    display: flex;
+    top: 10%;
+    width: 1263px;
+    height: 70px;
+    left: 10px;
+    margin-top: 420px;
+}
 #settings-menu .loctext, 
 #settings-menu .flavortext,
 #settings-menu .versionstext,
@@ -246,6 +255,13 @@ body, html {
 }
 .songoffsettext {
     left: 480px;
+}
+.alerttesttext {
+    color: inherit;
+    top: 50px;
+    position: absolute;
+    font-size: 40px;
+    left: 55px;
 }
 #locsearchlookup, #advlocsearchlookup,
 #extranameinput {
@@ -508,6 +524,49 @@ button#versions2010 {
     height: 38px;
     left: 580px;
     z-index: 100000;
+}
+#alerttesttype {
+    position: absolute;
+    margin-top: 55px;
+    left: 300px;
+    width: 340px;
+    height: 40px;
+    font-size: 24px;
+    z-index: 100000;
+}
+.alerttestbutton {
+    z-index: 10000;
+    position: absolute;
+    top: 55px;
+    width: 95px;
+    height: 40px;
+    font-size: 28px;
+    border: none;
+    background-color: #232731;
+}
+.alerttestbutton div {
+    margin-top: -1px;
+}
+button#alerttesttrigger {
+    left: 650px;
+}
+button#alerttestall {
+    left: 750px;
+}
+button#alerttestquebec {
+    left: 850px;
+    width: 130px;
+}
+button#alerttestclear {
+    left: 985px;
+    width: 110px;
+}
+.alertteststatus {
+    position: absolute;
+    left: 300px;
+    top: 98px;
+    font-size: 22px;
+    color: #0b5f00;
 }
 .extracitiesheader {
     color: inherit;

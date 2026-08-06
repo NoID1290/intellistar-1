@@ -114,6 +114,312 @@ function markFeedSuccess(feedName) {
 
 window.markFeedSuccess = markFeedSuccess;
 
+var alertTestRuntime = {
+    enabled: false,
+    mode: "off",
+    disasterType: "",
+    includeCrawl: true,
+    initialized: false
+};
+
+var ALERT_TYPE_ALIASES = {
+    amber: "AMBER Alert",
+    tornado: "Tornado Warning",
+    "severe-thunderstorm": "Severe Thunderstorm Warning",
+    severe: "Severe Thunderstorm Warning",
+    "flash-flood": "Flash Flood Warning",
+    flood: "Flood Warning",
+    hurricane: "Hurricane Warning",
+    tsunami: "Tsunami Warning",
+    blizzard: "Blizzard Warning",
+    "winter-storm": "Winter Storm Warning",
+    "ice-storm": "Ice Storm Warning",
+    wind: "High Wind Warning",
+    heat: "Heat Warning",
+    wildfire: "Fire Warning",
+    fire: "Fire Warning",
+    earthquake: "Earthquake Warning",
+    volcano: "Volcano Warning",
+    ashfall: "Ashfall Warning"
+};
+
+var QUEBEC_ALERT_TYPES = [
+    "Alerte AMBER",
+    "AMBER Alert",
+    "Alerte d'urgence civile",
+    "Civil Emergency Message",
+    "Evacuation Immediate",
+    "Shelter In Place Warning",
+    "911 Telephone Outage Emergency"
+];
+
+function normalizeDisasterAlertName(typeOrName) {
+    if (!typeOrName) {
+        return null;
+    }
+
+    var raw = String(typeOrName).trim();
+    if (!raw) {
+        return null;
+    }
+
+    if (warningSettings[raw]) {
+        return raw;
+    }
+
+    var lowered = raw.toLowerCase();
+    if (ALERT_TYPE_ALIASES[lowered]) {
+        return ALERT_TYPE_ALIASES[lowered];
+    }
+
+    var allNames = Object.keys(warningSettings);
+    for (let i = 0; i < allNames.length; i++) {
+        if (allNames[i].toLowerCase() === lowered) {
+            return allNames[i];
+        }
+    }
+
+    return null;
+}
+
+function getDisasterAlertCatalog() {
+    var names = Object.keys(warningSettings).filter((name) => {
+        var rule = warningSettings[name];
+        if (!rule || rule.included !== true) {
+            return false;
+        }
+        return name.endsWith("Warning") || name.startsWith("Alerte");
+    });
+
+    names.sort((a, b) => {
+        var ap = warningSettings[a] ? warningSettings[a].priority : 999;
+        var bp = warningSettings[b] ? warningSettings[b].priority : 999;
+        return ap - bp;
+    });
+    return names;
+}
+
+function buildTestBulletinAlert(name, index) {
+    var rule = warningSettings[name] || { priority: 125, severe: false };
+    return {
+        name: name,
+        significance: "W",
+        desc: `${name} TEST MESSAGE - THIS IS ONLY A TEST.`,
+        detailKey: `test-${name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${index}`,
+        severity: rule.severe ? "Severe" : "Moderate",
+        priority: rule.priority
+    };
+}
+
+function buildTestCrawlAlert(name) {
+    var rule = warningSettings[name] || { priority: 125, severe: false };
+    return {
+        name: name,
+        code: "TEST",
+        type: "Alert",
+        significance: "W",
+        description: `THIS IS A TEST ${name.toUpperCase()} FOR THIS LOCAL FORECAST AREA. THIS IS ONLY A TEST.`,
+        severe: !!rule.severe,
+        priority: rule.priority,
+        detailKey: `crawl-test-${name.replace(/[^a-z0-9]/gi, "-").toLowerCase()}`
+    };
+}
+
+function applyAlertTestSet(alertNames, includeCrawl) {
+    weatherInfo.bulletin.enabled = false;
+    weatherInfo.bulletin.alerts = [];
+    weatherInfo.bulletin.crawlAlert.enabled = false;
+    weatherInfo.bulletin.crawlAlert.alert = undefined;
+    weatherInfo.specialModes.bulletin = false;
+
+    if (!Array.isArray(alertNames) || alertNames.length === 0) {
+        endAlertCrawl();
+        return;
+    }
+
+    var selectedNames = alertNames.filter((name) => warningSettings[name]);
+    if (selectedNames.length === 0) {
+        endAlertCrawl();
+        return;
+    }
+
+    weatherInfo.bulletin.enabled = true;
+    weatherInfo.specialModes.bulletin = true;
+
+    var crawlName = null;
+    if (includeCrawl) {
+        crawlName = selectedNames.find((name) => warningSettings[name] && warningSettings[name].severe) || selectedNames[0];
+        weatherInfo.bulletin.crawlAlert.enabled = true;
+        weatherInfo.bulletin.crawlAlert.alert = buildTestCrawlAlert(crawlName);
+        setTimeout(startAlertCrawl, 150);
+    } else {
+        endAlertCrawl();
+    }
+
+    var alerts = [];
+    for (let i = 0; i < selectedNames.length; i++) {
+        if (selectedNames[i] === crawlName) {
+            continue;
+        }
+        alerts.push(buildTestBulletinAlert(selectedNames[i], i));
+    }
+
+    weatherInfo.bulletin.alerts = alerts.sort((a, b) => a.priority - b.priority);
+    markFeedSuccess("alerts");
+}
+
+function getRuntimeAlertTestState() {
+    if (!alertTestRuntime.initialized) {
+        var config = (typeof alertTestSettings === "object" && alertTestSettings) ? alertTestSettings : {};
+        alertTestRuntime.enabled = !!config.enabled;
+        alertTestRuntime.mode = (config.mode || "off").toLowerCase();
+        alertTestRuntime.disasterType = config.disasterType || "";
+        alertTestRuntime.includeCrawl = config.includeCrawl !== false;
+
+        try {
+            var params = new URLSearchParams(window.location.search || "");
+            if (params.has("alertTest")) {
+                var requested = (params.get("alertTest") || "").trim().toLowerCase();
+                if (requested === "off") {
+                    alertTestRuntime.enabled = false;
+                    alertTestRuntime.mode = "off";
+                } else if (requested === "all") {
+                    alertTestRuntime.enabled = true;
+                    alertTestRuntime.mode = "all";
+                } else if (requested === "quebec" || requested === "quebec-en-alerte") {
+                    alertTestRuntime.enabled = true;
+                    alertTestRuntime.mode = "quebec";
+                } else if (requested) {
+                    alertTestRuntime.enabled = true;
+                    alertTestRuntime.mode = "single";
+                    alertTestRuntime.disasterType = requested;
+                }
+            }
+
+            if (params.has("alertTestCrawl")) {
+                var crawlRaw = (params.get("alertTestCrawl") || "").toLowerCase();
+                alertTestRuntime.includeCrawl = crawlRaw !== "0" && crawlRaw !== "false" && crawlRaw !== "no";
+            }
+        } catch (error) {
+            console.warn("Failed to parse alert test URL params:", error);
+        }
+
+        alertTestRuntime.initialized = true;
+    }
+
+    return alertTestRuntime;
+}
+
+function applyAlertTestModeIfNeeded() {
+    var state = getRuntimeAlertTestState();
+    if (!state.enabled || state.mode === "off") {
+        return false;
+    }
+
+    if (state.mode === "all") {
+        applyAlertTestSet(getDisasterAlertCatalog(), state.includeCrawl);
+        return true;
+    }
+
+    if (state.mode === "quebec") {
+        applyAlertTestSet(QUEBEC_ALERT_TYPES, state.includeCrawl);
+        return true;
+    }
+
+    if (state.mode === "single") {
+        var normalized = normalizeDisasterAlertName(state.disasterType);
+        if (!normalized) {
+            console.warn(`Unknown alert test type '${state.disasterType}'. Falling back to live alerts.`);
+            return false;
+        }
+        applyAlertTestSet([normalized], state.includeCrawl);
+        return true;
+    }
+
+    return false;
+}
+
+function refreshSlidesForAlertTest() {
+    if (typeof flavorPicker === "function") {
+        slideFlavor = flavorPicker(slideSettings.flavor, {
+            bulletin: weatherInfo.specialModes.bulletin,
+            precip: weatherInfo.specialModes.precip
+        });
+    }
+}
+
+function setAlertTestState(nextState) {
+    var state = getRuntimeAlertTestState();
+    state.enabled = !!nextState.enabled;
+    state.mode = nextState.mode || "off";
+    state.disasterType = nextState.disasterType || "";
+    state.includeCrawl = nextState.includeCrawl !== false;
+}
+
+window.alertTest = {
+    listTypes: function () {
+        var catalog = getDisasterAlertCatalog();
+        console.log("Available disaster alert test types:", catalog);
+        return catalog;
+    },
+    trigger: async function (typeOrName, options) {
+        var name = normalizeDisasterAlertName(typeOrName);
+        if (!name) {
+            console.warn(`Unknown alert type '${typeOrName}'. Use alertTest.listTypes() to see valid values.`);
+            return false;
+        }
+        setAlertTestState({
+            enabled: true,
+            mode: "single",
+            disasterType: name,
+            includeCrawl: !(options && options.includeCrawl === false)
+        });
+        await grabAlerts();
+        refreshSlidesForAlertTest();
+        return true;
+    },
+    triggerAll: async function (options) {
+        setAlertTestState({
+            enabled: true,
+            mode: "all",
+            includeCrawl: !(options && options.includeCrawl === false)
+        });
+        await grabAlerts();
+        refreshSlidesForAlertTest();
+        return true;
+    },
+    triggerQuebec: async function (options) {
+        setAlertTestState({
+            enabled: true,
+            mode: "quebec",
+            includeCrawl: !(options && options.includeCrawl === false)
+        });
+        await grabAlerts();
+        refreshSlidesForAlertTest();
+        return true;
+    },
+    clear: async function () {
+        setAlertTestState({ enabled: false, mode: "off", disasterType: "", includeCrawl: true });
+        await grabAlerts();
+        refreshSlidesForAlertTest();
+        return true;
+    },
+    status: function () {
+        return { ...getRuntimeAlertTestState() };
+    },
+    help: function () {
+        console.log("alertTest.trigger('tornado')");
+        console.log("alertTest.trigger('Alerte de tornade')");
+        console.log("alertTest.triggerAll()");
+        console.log("alertTest.triggerQuebec()");
+        console.log("alertTest.clear()");
+        console.log("URL params: ?alertTest=tornado | ?alertTest=all | ?alertTest=quebec | ?alertTestCrawl=false");
+    }
+};
+
+window.triggerAlertTest = window.alertTest.trigger;
+window.triggerQuebecAlerteTest = window.alertTest.triggerQuebec;
+
 async function grabData() {
     var fetchIntervalMs = getFetchIntervalMs();
     if (dataRefreshState.lastFetchAttempt && Date.now() - dataRefreshState.lastFetchAttempt < fetchIntervalMs) {
@@ -444,6 +750,10 @@ async function grabAlerts() {
     weatherInfo.bulletin.enabled = false;
     weatherInfo.bulletin.crawlAlert.enabled = false;
     weatherInfo.specialModes.bulletin = false;
+
+    if (applyAlertTestModeIfNeeded()) {
+        return;
+    }
 
     var geocodes = [];
     if (locationConfig.mainCity && locationConfig.mainCity.lat !== "" && locationConfig.mainCity.lon !== "") {
