@@ -69,8 +69,8 @@
 				"name": "Saint-Remi",
 				"lat": 45.261,
 				"lon": -73.618,
-				"left": 3920,
-				"top": -900
+				"left": 4079,
+				"top": -855
 			},
 			{
 				"name": "Sherbrooke",
@@ -83,15 +83,15 @@
 				"name": "Trois-Rivieres",
 				"lat": 46.342,
 				"lon": -72.542,
-				"left": 4160,
-				"top": -1060
+				"left": 3970,
+				"top": -1090
 			},
 			{
 				"name": "Drummondville",
 				"lat": 45.88,
 				"lon": -72.484,
-				"left": 4210,
-				"top": -990
+				"left": 4220,
+				"top": -1050
 			},
 			{
 				"name": "Mont-Laurier",

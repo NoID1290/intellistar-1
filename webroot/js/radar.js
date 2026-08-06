@@ -31,63 +31,75 @@ var mapStyle = {
     ],
 };
 
+function buildLocalRadarStyle(baseStyle) {
+  var localStyle = JSON.parse(JSON.stringify(baseStyle || mapStyle));
+  if (localStyle.sources && localStyle.sources["raster-tiles"]) {
+    localStyle.sources["raster-tiles"].tiles = [
+      "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    ];
+  }
+  return localStyle;
+}
+
 async function createMaps() {
   var radarCoords = [
     !locationConfig.mainCity.lon || !locationConfig.mainCity.lat ? 0 : locationConfig.mainCity.lon,
     !locationConfig.mainCity.lat || !locationConfig.mainCity.lon ? 0 : locationConfig.mainCity.lat
-  ]
+  ];
+  var regionalMapStyle = mapStyle;
+  var localMapStyle = buildLocalRadarStyle(mapStyle);
   regradar = new maplibregl.Map({
     container: "regradar",
-    style: mapStyle,
+    style: regionalMapStyle,
     zoom: 7.7,
     center: radarCoords
   });
 
   regmap = new maplibregl.Map({
     container: "regmap",
-    style: mapStyle,
+    style: regionalMapStyle,
     zoom: 7.7,
     center: radarCoords
   });
 
   regoutlines = new maplibregl.Map({
     container: "regoutlines",
-    style: mapStyle,
+    style: regionalMapStyle,
     zoom: 7.7,
     center: radarCoords
   });
 
   regoutlinestrans = new maplibregl.Map({
     container: "regoutlinestrans",
-    style: mapStyle,
+    style: regionalMapStyle,
     zoom: 7.7,
     center: radarCoords
   });
 
   locradar = new maplibregl.Map({
     container: "locradar",
-    style: mapStyle,
+    style: localMapStyle,
     zoom: 8.65,
     center: radarCoords
   });
 
   locmap = new maplibregl.Map({
     container: "locmap",
-    style: mapStyle,
+    style: localMapStyle,
     zoom: 8.65,
     center: radarCoords
   });
 
   locoutlines = new maplibregl.Map({
     container: "locoutlines",
-    style: mapStyle,
+    style: localMapStyle,
     zoom: 8.65,
     center: radarCoords
   });
 
   locoutlinestrans = new maplibregl.Map({
     container: "locoutlinestrans",
-    style: mapStyle,
+    style: localMapStyle,
     zoom: 8.65,
     center: radarCoords
   });

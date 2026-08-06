@@ -443,68 +443,118 @@ async function grabAlerts() {
     weatherInfo.bulletin.alerts = [];
     weatherInfo.bulletin.enabled = false;
     weatherInfo.bulletin.crawlAlert.enabled = false;
-    weatherInfo.specialModes.bulletin = false
-    $.getJSON(`https://api.weather.com/v3/alerts/headlines?geocode=${locationConfig.mainCity.lat},${locationConfig.mainCity.lon}&format=json&language=en-US&apiKey=${api_key}`, function (data) {
-        markFeedSuccess("alerts");
-        if (!data) {
-            weatherInfo.bulletin.enabled = false;
-            weatherInfo.bulletin.crawlAlert.enabled = false;
-            weatherInfo.bulletin.crawlAlert.alert = undefined;
-            endAlertCrawl();
-            return;
-        }
-        weatherInfo.bulletin.enabled = true;
-        for (let i = 0; i < data.alerts.length; i++) {
-            if(data.alerts[i].eventDescription == "Special Weather Statement"){
-                grabAlertCrawl(data.alerts[i].detailKey);
+    weatherInfo.specialModes.bulletin = false;
+
+    var geocodes = [];
+    if (locationConfig.mainCity && locationConfig.mainCity.lat !== "" && locationConfig.mainCity.lon !== "") {
+        geocodes.push(`${locationConfig.mainCity.lat},${locationConfig.mainCity.lon}`);
+    }
+    if (locationConfig.eightCities && Array.isArray(locationConfig.eightCities.cities)) {
+        for (let i = 0; i < locationConfig.eightCities.cities.length; i++) {
+            var city = locationConfig.eightCities.cities[i];
+            if (!city || city.lat === "" || city.lon === "") {
                 continue;
             }
-            var bulletinAlert = {
-                name: data.alerts[i].eventDescription,
-                significance: data.alerts[i].significance,
-                desc: data.alerts[i].headlineText,
-                detailKey: data.alerts[i].detailKey,
-                severity: data.alerts[i].severity
-            }
-            
-            if(warningSettings[data.alerts[i].eventDescription]){
-                bulletinAlert.priority = warningSettings[data.alerts[i].eventDescription].priority
-                if(!warningSettings[data.alerts[i].eventDescription].included){
-                    return;
-                }
-            }
-            else{bulletinAlert.priority = 125;}
+            geocodes.push(`${city.lat},${city.lon}`);
+        }
+    }
 
-            var sameBulletin = false;
-            for(let j = 0; j < weatherInfo.bulletin.alerts.length; j++){
-                if(data.alerts[i].eventDescription == weatherInfo.bulletin.alerts[j].name){
-                    sameBulletin = true;
-                }
-            }
-            if(sameBulletin){continue}
-            if (weatherInfo.bulletin.crawlAlert.enabled == false && data.alerts[i].urgencyCode == 1) {
-                weatherInfo.bulletin.crawlAlert.enabled = true;
-                grabAlertCrawl(bulletinAlert.detailKey);
-            } else {
-                weatherInfo.bulletin.alerts.push(bulletinAlert);
-            }
-        }
-        weatherInfo.bulletin.alerts = weatherInfo.bulletin.alerts.sort((a, b) => a.priority - b.priority);
-        if(weatherInfo.bulletin.alerts.length > 0){weatherInfo.specialModes.bulletin = true}
-        else{
-            weatherInfo.specialModes.bulletin = false;
-            weatherInfo.bulletin.enabled = false;
-            weatherInfo.bulletin.crawlAlert.enabled = false;
-            weatherInfo.bulletin.crawlAlert.alert = undefined;
-            endAlertCrawl();
-        }
-    }).fail(function () {
-        if(weatherInfo.bulletin.alerts.length <= 0){weatherInfo.specialModes.bulletin = false}
+    geocodes = [...new Set(geocodes)];
+    if (geocodes.length === 0) {
+        weatherInfo.bulletin.crawlAlert.alert = undefined;
+        endAlertCrawl();
+        return;
+    }
+
+    var alertRequests = geocodes.map((geocode) => {
+        return new Promise((resolve) => {
+            $.getJSON(`https://api.weather.com/v3/alerts/headlines?geocode=${geocode}&format=json&language=en-US&apiKey=${api_key}`, function (data) {
+                resolve({ ok: true, data: data });
+            }).fail(function () {
+                resolve({ ok: false, data: null });
+            });
+        });
+    });
+
+    var alertResponses = await Promise.all(alertRequests);
+    var successfulResponses = alertResponses.filter((response) => response.ok && response.data);
+
+    if (successfulResponses.length === 0) {
         weatherInfo.bulletin.enabled = false;
         weatherInfo.bulletin.crawlAlert.enabled = false;
         weatherInfo.bulletin.crawlAlert.alert = undefined;
         endAlertCrawl();
-    })
+        return;
+    }
+
+    markFeedSuccess("alerts");
+    weatherInfo.bulletin.enabled = true;
+
+    var mergedAlerts = [];
+    for (let i = 0; i < successfulResponses.length; i++) {
+        var responseAlerts = successfulResponses[i].data.alerts;
+        if (!Array.isArray(responseAlerts)) {
+            continue;
+        }
+        for (let j = 0; j < responseAlerts.length; j++) {
+            mergedAlerts.push(responseAlerts[j]);
+        }
+    }
+
+    var seenAlertKeys = new Set();
+    var crawlAlertRequested = false;
+    for (let i = 0; i < mergedAlerts.length; i++) {
+        var sourceAlert = mergedAlerts[i];
+        if (!sourceAlert) {
+            continue;
+        }
+
+        if (sourceAlert.eventDescription == "Special Weather Statement") {
+            if (sourceAlert.detailKey) {
+                grabAlertCrawl(sourceAlert.detailKey);
+            }
+            continue;
+        }
+
+        var alertRules = warningSettings[sourceAlert.eventDescription];
+        if (alertRules && !alertRules.included) {
+            continue;
+        }
+
+        var dedupeKey = sourceAlert.detailKey || `${sourceAlert.eventDescription}|${sourceAlert.headlineText}`;
+        if (seenAlertKeys.has(dedupeKey)) {
+            continue;
+        }
+        seenAlertKeys.add(dedupeKey);
+
+        var bulletinAlert = {
+            name: sourceAlert.eventDescription,
+            significance: sourceAlert.significance,
+            desc: sourceAlert.headlineText,
+            detailKey: sourceAlert.detailKey,
+            severity: sourceAlert.severity,
+            priority: alertRules ? alertRules.priority : 125
+        };
+
+        if (!crawlAlertRequested && sourceAlert.urgencyCode == 1 && bulletinAlert.detailKey) {
+            weatherInfo.bulletin.crawlAlert.enabled = true;
+            crawlAlertRequested = true;
+            grabAlertCrawl(bulletinAlert.detailKey);
+        } else {
+            weatherInfo.bulletin.alerts.push(bulletinAlert);
+        }
+    }
+
+    weatherInfo.bulletin.alerts = weatherInfo.bulletin.alerts.sort((a, b) => a.priority - b.priority);
+    if (weatherInfo.bulletin.alerts.length > 0 || weatherInfo.bulletin.crawlAlert.enabled) {
+        weatherInfo.specialModes.bulletin = true;
+    } else {
+        weatherInfo.specialModes.bulletin = false;
+        weatherInfo.bulletin.enabled = false;
+        weatherInfo.bulletin.crawlAlert.enabled = false;
+        weatherInfo.bulletin.crawlAlert.alert = undefined;
+        endAlertCrawl();
+    }
 }
 function grabAlertCrawl(dKey) {
     weatherInfo.bulletin.crawlAlert.enabled = true;

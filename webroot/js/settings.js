@@ -241,14 +241,57 @@ function flavorChanger(flv){
  * @returns 
  */
 function flavorPicker(time, modes) {
-    if(slideSettings.auto == false){return slideSettings;}
+    function normalizeToLocalDoppler(order) {
+        if (!Array.isArray(order)) {
+            return [];
+        }
+
+        var normalized = [];
+        var hasLocalDoppler = false;
+        for (let i = 0; i < order.length; i++) {
+            var slide = order[i];
+            if (!slide || !slide.function) {
+                continue;
+            }
+
+            if (slide.function === "radarDoppler") {
+                if (hasLocalDoppler) {
+                    continue;
+                }
+                normalized.push({ ...slide, function: "localDoppler" });
+                hasLocalDoppler = true;
+                continue;
+            }
+
+            if (slide.function === "localDoppler") {
+                if (hasLocalDoppler) {
+                    continue;
+                }
+                hasLocalDoppler = true;
+            }
+
+            normalized.push(slide);
+        }
+
+        return normalized;
+    }
+
+    if(slideSettings.auto == false){
+        return {
+            ...slideSettings,
+            order: normalizeToLocalDoppler(slideSettings.order)
+        };
+    }
     if(time == '') time = '120';
     if(modes.bulletin == undefined) modes.bulletin = false;
     if(modes.precip == undefined) modes.precip = false;
 
     var usableFlavors = slideFlavors[`${time}sec`].filter(f => f.bulletin === modes.bulletin && f.precip === modes.precip);
     var flavor = usableFlavors[Math.floor(Math.random() * usableFlavors.length)];
-    return flavor;
+    return {
+        ...flavor,
+        order: normalizeToLocalDoppler(flavor.order)
+    };
 }
 
 function locationSearch(id){
