@@ -55,27 +55,6 @@ body, html {
     font-size: 100%
 }
 
-#data-last-updated {
-    position: fixed;
-    right: 14px;
-    bottom: 12px;
-    z-index: 3000;
-    padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(8, 16, 30, 0.78);
-    color: #d4d4d4;
-    font-family: "Interstate", Arial, Helvetica, sans-serif;
-    font-size: 13px;
-    letter-spacing: 0.5px;
-    border-radius: 3px;
-    pointer-events: none;
-}
-
-#data-last-updated.error {
-    color: #ffd0d0;
-    border-color: rgba(255, 96, 96, 0.6);
-}
-
 #main {
     position: absolute;
     top: 50%;

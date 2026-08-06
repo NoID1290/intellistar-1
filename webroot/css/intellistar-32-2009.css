@@ -217,6 +217,25 @@
     z-index: 7;
     text-align: center;
 }
+/* No width: shrink-to-fit grows leftward from the clock so it can never clip. */
+.ldl-blue .data-updated {
+    position: absolute;
+    bottom: 131px;
+    right: 600px;
+    height: 40px;
+    line-height: 40px;
+    text-align: right;
+    color: #e6e6e6;
+    font-family: "Interstate", Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    z-index: 7;
+    pointer-events: none;
+}
+.ldl-blue .data-updated.error {
+    color: #ffd0d0;
+}
 .ldl-blue .time span {
     color: #e6e6e6;
     font-family: "Helvetica Black";
@@ -518,6 +537,25 @@
 }
 .ldl-black .time {
     letter-spacing: -1px;
+}
+/* No width: shrink-to-fit grows leftward from the clock so it can never clip. */
+.ldl-black .data-updated {
+    position: absolute;
+    bottom: 126px;
+    right: 500px;
+    height: 36px;
+    line-height: 36px;
+    text-align: right;
+    color: #171717;
+    font-family: "Interstate", Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+}
+.ldl-black .data-updated.error {
+    color: #a01010;
 }
 
 .radar .banner {

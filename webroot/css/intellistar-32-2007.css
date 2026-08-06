@@ -116,6 +116,25 @@
 .ldl-black .time {
     letter-spacing: -1px;
 }
+/* No width: shrink-to-fit grows leftward from the clock so it can never clip. */
+.ldl-black .data-updated {
+    position: absolute;
+    bottom: 126px;
+    right: 500px;
+    height: 36px;
+    line-height: 36px;
+    text-align: right;
+    color: #171717;
+    font-family: "Interstate", Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+}
+.ldl-black .data-updated.error {
+    color: #a01010;
+}
 .ldl-black .crawl {
     position: absolute;
     bottom: 66px;

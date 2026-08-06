@@ -35,7 +35,7 @@ function setLocationConfigError(message) {
     console.error("[Config] " + message);
     $(".loctext").text("Location Error: " + message);
     $(".loctext").css("color", "#ff8f8f");
-    $("#data-last-updated").text("Weather Data: blocked by config error").addClass("error");
+    $(".data-updated").text("Weather Data: blocked by config error").addClass("error");
     $("#startbutton").css("opacity", "0.5");
     $("#startbutton").css("pointer-events", "none");
 }
@@ -43,7 +43,7 @@ function setLocationConfigError(message) {
 function clearLocationConfigError() {
     locationConfigLoadError = "";
     $(".loctext").css("color", "");
-    $("#data-last-updated").removeClass("error");
+    $(".data-updated").removeClass("error");
     $("#startbutton").css("opacity", "");
     $("#startbutton").css("pointer-events", "");
 }

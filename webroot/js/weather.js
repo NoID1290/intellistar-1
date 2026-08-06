@@ -102,7 +102,7 @@ function updateLastUpdatedIndicator() {
     var forecastStamp = formatTimestamp(dataRefreshState.lastSuccessful.forecast);
     var alertsStamp = formatTimestamp(dataRefreshState.lastSuccessful.alerts);
     var radarStamp = formatTimestamp(dataRefreshState.lastSuccessful.radar);
-    $("#data-last-updated")
+    $(".data-updated")
         .text(`Weather Data Updated - Forecast ${forecastStamp} | Alerts ${alertsStamp} | Radar ${radarStamp}`)
         .removeClass("error");
 }
