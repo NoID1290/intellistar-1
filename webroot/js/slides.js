@@ -43,6 +43,50 @@ function slideCallBack() {
     showSlides();
 };
 var slidePrograms = {
+    getMapPaging() {
+        var configured = Number(locationSettings && locationSettings.mapCities && locationSettings.mapCities.citiesPerSlide);
+        if (!Number.isFinite(configured) || configured <= 0) {
+            configured = 10;
+        }
+        var perPage = Math.max(1, Math.min(10, Math.floor(configured)));
+        var totalCities = locationConfig.regionalMap.map.length;
+        var totalPages = Math.max(1, Math.ceil(totalCities / perPage));
+        return { perPage, totalCities, totalPages };
+    },
+    renderMapPage(midx, pageIdx, mode, fadeInMs) {
+        var mapDivs = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+        var paging = slidePrograms.getMapPaging();
+        var start = pageIdx * paging.perPage;
+
+        for (let slot = 0; slot < mapDivs.length; slot++) {
+            $(`.map-cities .city.${mapDivs[slot]}`).fadeOut(0);
+        }
+
+        for (let slot = 0; slot < paging.perPage; slot++) {
+            let cityIndex = start + slot;
+            if (cityIndex >= paging.totalCities || slot >= mapDivs.length) { break; }
+
+            try {
+                let city = locationConfig.regionalMap.map[cityIndex];
+                let cityDiv = `.map-cities .city.${mapDivs[slot]}`;
+                $(cityDiv).fadeIn(fadeInMs, 'linear');
+                $(`${cityDiv} .city-name`).text(city.name);
+                $(cityDiv).css({ left: city.left, top: city.top });
+
+                if (mode === 'current') {
+                    $(`${cityDiv} .temp`).text(weatherInfo.map.mapCities[cityIndex].current.temp);
+                    getIcon($(`${cityDiv} .icon`), weatherInfo.map.mapCities[cityIndex].current.icon, "current", "large");
+                } else {
+                    $(`${cityDiv} .temp`).text(weatherInfo.map.mapCities[cityIndex].forecasts[midx].temp);
+                    getIcon($(`${cityDiv} .icon`), weatherInfo.map.mapCities[cityIndex].forecasts[midx].icon, "forecast", "large");
+                }
+            } catch (error) {
+                let cityDiv = `.map-cities .city.${mapDivs[slot]}`;
+                $(`${cityDiv} .temp`).text("");
+                getIcon($(`${cityDiv} .icon`), "blank", mode === 'current' ? "current" : "forecast", "large");
+            }
+        }
+    },
     currentConditions() {
         try {
             audioPlayer.vocallocal.cc = vocallocalCC()
@@ -53,15 +97,19 @@ var slidePrograms = {
             $(".current-conditions .humidity").text(weatherInfo.currentConditions.humidity);
             $(".current-conditions .dewpoint").text(weatherInfo.currentConditions.dewpoint + "°");
             $(".current-conditions .pressure .data").text(weatherInfo.currentConditions.pressure.val);
+            $(".current-conditions .pressure .inches").text(isMetric() ? "kPa" : "INCHES");
             $(".current-conditions .visibility .data").text(weatherInfo.currentConditions.visibility);
+            $(".current-conditions .visibility .miles").text(isMetric() ? "KM" : "MILES");
             $(".current-conditions .wind").text(weatherInfo.currentConditions.wind);
             if (weatherInfo.currentConditions.gusts != "None") {
                 $(".current-conditions .gusts .data").text(weatherInfo.currentConditions.gusts);
+                $(".current-conditions .gusts .miles").text(isMetric() ? "KM/H" : "MPH");
                 $(".current-conditions .gusts .miles").fadeIn(0);
             } else {
                 $(".current-conditions .gusts .none").fadeIn(0);
                 $(".current-conditions .gusts .miles").fadeOut(0);
             }
+            $('.current-conditions .labels').html('HUMIDITY<br>DEW POINT<br>PRESSURE<br>VISIBILITY<br>WIND<br>GUSTS<br>');
             if (weatherInfo.currentConditions.feelslike.type != null) {
                 $('.current-conditions .labels').append(`${weatherInfo.currentConditions.feelslike.type.toUpperCase()}`);
                 $('.current-conditions .feelslike').fadeIn(0);
@@ -104,6 +152,7 @@ var slidePrograms = {
                 throw new Error("No local observations");
             }
             $('.eight-cities').fadeIn(0);
+            $(".eight-cities .top .wind").text(isMetric() ? "WIND (km/h)" : "WIND (mph)");
             function eightCities(offset) {
                 var loDivs = ["i", "ii", "iii", "iv"];
                 for (var i = 0; i < 4; i++) {
@@ -231,6 +280,7 @@ var slidePrograms = {
         var aqDiv = { 1: "low", 2: "moderate", 3: "unhealthy", 4: "high", 5: "extreme" }[weatherInfo.airQuality.categoryIndex];
         var day = { 0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday" }[new Date().getDay()]
         $('.air-quality .day').text(day + ":");
+        $('.primpollut .pollutants').empty();
         for (var i = 0; i < weatherInfo.airQuality.pollutants.length; i++) {
             $('.primpollut .pollutants').append(`<span>${weatherInfo.airQuality.pollutants[i]}</span>`);
         }
@@ -253,11 +303,11 @@ var slidePrograms = {
         $('.almanac .box').fadeIn(167, 'linear');
         $('.almanac .header').fadeIn(333, 'linear');
         $('.almanac .day.i .almheader').text(weatherInfo.almanac.days[0].day);
-        $('.almanac .day.i .sunrise').append(weatherInfo.almanac.days[0].sunrise.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
-        $('.almanac .day.i .sunset').append(weatherInfo.almanac.days[0].sunset.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
+        $('.almanac .day.i .sunrise').html(weatherInfo.almanac.days[0].sunrise.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
+        $('.almanac .day.i .sunset').html(weatherInfo.almanac.days[0].sunset.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
         $('.almanac .day.ii .almheader').text(weatherInfo.almanac.days[1].day);
-        $('.almanac .day.ii .sunrise').append(weatherInfo.almanac.days[1].sunrise.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
-        $('.almanac .day.ii .sunset').append(weatherInfo.almanac.days[1].sunset.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
+        $('.almanac .day.ii .sunrise').html(weatherInfo.almanac.days[1].sunrise.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
+        $('.almanac .day.ii .sunset').html(weatherInfo.almanac.days[1].sunset.replace("am", "<span>am</span>").replace("pm", "<span>pm</span>"));
         $('.almanac .stationname').text(weatherInfo.almanac.stationname);
         $('.almanac .almdate').text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toUpperCase());
         $('.almanac .yesterday .high').text(weatherInfo.almanac.yesterday.high);
@@ -283,13 +333,9 @@ var slidePrograms = {
         $('.radar').fadeIn(0);
         $('#regradar').fadeIn(0);
         $('#regmap').fadeIn(0);
-        if(mapStyle == "mapbox://styles/colster/cmiccqynn00as01s4bt6501il"){
-            $('#regoutlines').fadeIn(0);
-            $('#regoutlinestrans').fadeIn(0);
-            addRadarCities();
-            $(".reg-cities").fadeIn(0);
-            $(".reg-cities-trans").fadeIn(0);
-        }
+        addRadarCities();
+        $(".reg-cities").fadeIn(0);
+        $(".reg-cities-trans").fadeIn(0);
         regmap.resize();
         regradar.resize();
         regoutlines.resize();
@@ -314,12 +360,9 @@ var slidePrograms = {
         $('.radar').fadeIn(0);
         $('#locradar').fadeIn(0);
         $('#locmap').fadeIn(0);
-        if(mapStyle == "mapbox://styles/colster/cmiccqynn00as01s4bt6501il"){
-            $('#locoutlines').fadeIn(0);
-            $('#locoutlinestrans').fadeIn(0);
-            $(".loc-cities").fadeIn(0);
-            $(".loc-cities-trans").fadeIn(0);
-        }
+        addRadarCities();
+        $(".loc-cities").fadeIn(0);
+        $(".loc-cities-trans").fadeIn(0);
         locmap.resize();
         locradar.resize();
         locoutlines.resize();
@@ -412,60 +455,58 @@ var slidePrograms = {
             $(`.map-cities .city.${mapDivs[i]}`).css({ left: locationConfig.regionalMap.map[i].left, top: locationConfig.regionalMap.map[i].top })
         }
     },
-    mapCurrent() {
+    mapCurrent(pageIdx) {
+        if (pageIdx === undefined) { pageIdx = 0; }
+        var paging = slidePrograms.getMapPaging();
         $('.map').fadeIn(0);
-        $('.map .header').text("Now");
+        $('.map .header').text(paging.totalPages > 1 ? `Now (${pageIdx + 1}/${paging.totalPages})` : "Now");
         $('.map .header').fadeIn(167, 'linear');
-        var mapDivs = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]
-        for (let i = 0; i < locationConfig.regionalMap.map.length; i++) {
-            try {
-                $(`.map-cities .city.${mapDivs[i]}`).fadeIn(0);
-                $(`.map-cities .city.${mapDivs[i]} .city-name`).text(locationConfig.regionalMap.map[i].name);
-                $(`.map-cities .city.${mapDivs[i]}`).css({ left: locationConfig.regionalMap.map[i].left, top: locationConfig.regionalMap.map[i].top });
-                $(`.map-cities .city.${mapDivs[i]} .temp`).text(weatherInfo.map.mapCities[i].current.temp);
-                getIcon($(`.map-cities .city.${mapDivs[i]} .icon`), weatherInfo.map.mapCities[i].current.icon, "current", "large");
-            } catch (error) {
-                $(`.map-cities .city.${mapDivs[i]} .temp`).text("");
-                getIcon($(`.map-cities .city.${mapDivs[i]} .icon`), "blank", "current", "large");
-            }
-        }
+        slidePrograms.renderMapPage(0, pageIdx, 'current', 0);
 
         setTimeout(() => {
             $('.map .header').fadeOut(167, 'linear');
             setTimeout(() => {
-                $('.map').fadeOut(0);
-                slideCallBack();
+                if (pageIdx < paging.totalPages - 1) {
+                    $('.map').fadeOut(0);
+                    slidePrograms.mapCurrent(pageIdx + 1);
+                } else {
+                    $('.map').fadeOut(0);
+                    slideCallBack();
+                }
             }, 167);
         }, slideLength - 167);
     },
-    mapForecast(midx) {
+    mapForecast(midx, pageIdx) {
         if (midx === undefined) { midx = 0; }
+        if (pageIdx === undefined) { pageIdx = 0; }
+        var paging = slidePrograms.getMapPaging();
         $('.map').fadeIn(0);
-        $('.map .header').text(`${weatherInfo.map.days[midx]}'s Forecast`);
+        $('.map .header').text(paging.totalPages > 1
+            ? `${weatherInfo.map.days[midx]}'s Forecast (${pageIdx + 1}/${paging.totalPages})`
+            : `${weatherInfo.map.days[midx]}'s Forecast`);
         $('.map .header').fadeIn(167, 'linear');
-        var mapDivs = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]
-        for (let i = 0; i < locationConfig.regionalMap.map.length; i++) {
-            try {
-                $(`.map-cities .city.${mapDivs[i]}`).fadeIn((midx == 0 ? 0 : 167), 'linear');
-                $(`.map-cities .city.${mapDivs[i]} .city-name`).text(locationConfig.regionalMap.map[i].name);
-                $(`.map-cities .city.${mapDivs[i]}`).css({ left: locationConfig.regionalMap.map[i].left, top: locationConfig.regionalMap.map[i].top });
-                $(`.map-cities .city.${mapDivs[i]} .temp`).text(weatherInfo.map.mapCities[i].forecasts[midx].temp);
-                getIcon($(`.map-cities .city.${mapDivs[i]} .icon`), weatherInfo.map.mapCities[i].forecasts[midx].icon, "forecast", "large");
-            } catch (error) {
-                $(`.map-cities .city.${mapDivs[i]} .temp`).text("");
-                getIcon($(`.map-cities .city.${mapDivs[i]} .icon`), "blank");
-            }
-        }
+        slidePrograms.renderMapPage(midx, pageIdx, 'forecast', (midx == 0 && pageIdx == 0 ? 0 : 167));
 
         setTimeout(() => {
             if (slideFlavor.order[idx].slides == undefined) {
                 $('.map .header').fadeOut(167, 'linear');
                 setTimeout(() => {
-                    $('.map').fadeOut(0);
-                    slideCallBack();
+                    if (pageIdx < paging.totalPages - 1) {
+                        $('.map').fadeOut(0);
+                        slidePrograms.mapForecast(midx, pageIdx + 1);
+                    } else {
+                        $('.map').fadeOut(0);
+                        slideCallBack();
+                    }
                 }, 167);
             } else {
-                if (midx >= slideFlavor.order[idx].slides - 1) {
+                if (pageIdx < paging.totalPages - 1) {
+                    $('.map .header').fadeOut(167, 'linear');
+                    setTimeout(() => {
+                        $('.map').fadeOut(0);
+                        slidePrograms.mapForecast(midx, pageIdx + 1);
+                    }, 167);
+                } else if (midx >= slideFlavor.order[idx].slides - 1) {
                     $('.map .header').fadeOut(167, 'linear');
                     setTimeout(() => {
                         $('.map').fadeOut(0);
@@ -473,12 +514,13 @@ var slidePrograms = {
                     }, 167);
                 } else {
                     $('.map .header').fadeOut(167, 'linear');
-                    for (let i = 0; i < locationConfig.regionalMap.map.length; i++) {
+                    for (let i = 0; i < 10; i++) {
+                        let mapDivs = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
                         $(`.map-cities .city.${mapDivs[i]}`).fadeOut(167);
                     }
                     setTimeout(() => {
                         $('.map').fadeOut(0);
-                        slidePrograms.mapForecast(midx + 1);
+                        slidePrograms.mapForecast(midx + 1, 0);
                     }, 167);
                 }
             }
@@ -521,13 +563,25 @@ function showSlides() {
     if (nidx >= slideFlavor.order.length) {
         nidx = 0;
         slideCallBack = function () {
-            $("#main").fadeOut(0);
-            audioPlayer.stopPlaying();
-            audioPlayer = null;
-            //URL.revokeObjectURL(songURL);
-            setTimeout(() => {
-                window.location.reload();
-            }, 3000);
+            // Continuous loop: refresh data, pick new flavor, restart slides
+            console.log('[Slides] Cycle complete, refreshing data and restarting...');
+            idx = 0;
+            nidx = 1;
+            grabData().then(function () {
+                setTimeout(function () {
+                    slideFlavor = flavorPicker(slideSettings.flavor, {
+                        bulletin: weatherInfo.specialModes.bulletin,
+                        precip: weatherInfo.specialModes.precip
+                    });
+                    // Reset slideCallBack to normal for next cycle
+                    slideCallBack = function () {
+                        idx++;
+                        nidx++;
+                        showSlides();
+                    };
+                    showSlides();
+                }, 500);
+            });
         }
     }
     currentProgram = slidePrograms[slideFlavor.order[idx].function]

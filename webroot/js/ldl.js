@@ -68,12 +68,6 @@ function blackLDLObs(){
     $(".ldl-black .observations").fadeIn(0);
     $(".ldl-black .weathercomlogo").fadeIn(0);
     var observations = [
-        localWeatherID = function(){
-            $(".ldl-black .currently").fadeOut(0);
-            $(".ldl-black .info-header").fadeOut(0);
-            $(".ldl-black .info").fadeOut(0);
-            $(".ldl-black .city-name").text("Local weather ID: " + locWeatherID);
-        },
         cc = function(){
             $(".ldl-black .currently").fadeIn(0);
             $(".ldl-black .info").fadeIn(0);
@@ -92,7 +86,7 @@ function blackLDLObs(){
         gusts = weatherInfo.currentConditions.gusts == "None" ? null : function(){
             $(".ldl-black .info-header").text("GUSTS:");
             $(".ldl-black .info").empty();
-            $(".ldl-black .info").append(`${weatherInfo.currentConditions.gusts}<span>MPH</span>`)
+            $(".ldl-black .info").append(`${weatherInfo.currentConditions.gusts}<span>${isMetric() ? "KM/H" : "MPH"}</span>`)
         },
         humidity = function(){
             $(".ldl-black .info-header").text("HUMIDITY:");
@@ -112,14 +106,30 @@ function blackLDLObs(){
         visibility = function(){
             $(".ldl-black .info-header").text("VISIBILITY:");
             $(".ldl-black .info").empty();
-            $(".ldl-black .info").append(`${weatherInfo.currentConditions.visibility}<span>MI</span>`)
+            $(".ldl-black .info").append(`${weatherInfo.currentConditions.visibility}<span>${isMetric() ? "KM" : "MI"}</span>`)
         },
         precip = weatherInfo.monthlyPrecip == "0.00" ? null : function(){
             $(".ldl-black .info-header").text(`${today.toLocaleDateString("en-US", {month: 'short'}).toUpperCase()} PRECIP:`);
             $(".ldl-black .info").empty();
-            $(".ldl-black .info").append(`${weatherInfo.monthlyPrecip}<span>IN</span>`)
+            $(".ldl-black .info").append(`${weatherInfo.monthlyPrecip}<span>${isMetric() ? "MM" : "IN"}</span>`)
         }
-    ]
+    ];
+
+    if (weatherInfo.eightCities && weatherInfo.eightCities.cities) {
+        weatherInfo.eightCities.cities.forEach(c => {
+            if (c.name && c.temp !== "" && c.temp !== undefined) {
+                observations.push(function() {
+                    $(".ldl-black .currently").fadeIn(0);
+                    $(".ldl-black .info").fadeIn(0);
+                    $(".ldl-black .info-header").fadeOut(0);
+                    $(".ldl-black .info").text(`${c.temp}°`);
+                    getIcon($(".ldl-black .icon"), c.icon, "ldl", undefined);
+                    $(".ldl-black .icon").fadeIn(0);
+                    $(".ldl-black .city-name").text(c.name);
+                });
+            }
+        });
+    }
     var currentProgram = observations[ldlIndex % observations.length];
     if(currentProgram == null){
         ldlIndex++;
@@ -252,16 +262,6 @@ function adCrawlBlue(idx){
 //city-name is loc weather id too, start from margin-top -60px down to 8px
 function blueLDLObs(){
     var observations = [
-        localWeatherID = function(){
-            $(".ldl-blue .observations .city-name").fadeIn(0);
-            $(".ldl-blue .observations .city-name").text("Local weather ID: " + locWeatherID);
-            $(".ldl-blue .observations .city-name").animate({'margin-top': '4px'}, 333, 'linear');
-            setTimeout(() => {
-                $(".ldl-blue .observations .city-name").fadeOut(333, 'linear', function(){
-                    $(".ldl-blue .observations .city-name").css('margin-top', '-60px');
-                })
-            }, 3667);
-        },
         cc = function(){
             $(".ldl-blue .observations .city-name").fadeIn(0);
             $(".ldl-blue .observations .tempobs").fadeIn(0);
@@ -295,7 +295,7 @@ function blueLDLObs(){
         $(".ldl-blue .observations .city-name").text(locationConfig.mainCity.displayname);
         $(".ldl-blue .observations .city-name").animate({'margin-top': '8px'}, 333, 'linear');
             $(".ldl-blue .observations .gusts").fadeIn(0);
-            $(".ldl-blue .gusts .info").html(`${weatherInfo.currentConditions.gusts}<span>MPH</span>`);
+            $(".ldl-blue .gusts .info").html(`${weatherInfo.currentConditions.gusts}<span>${isMetric() ? "KM/H" : "MPH"}</span>`);
             $(".ldl-blue .observations .gusts").animate({'margin-top': '0px'}, 333, 'linear');
             setTimeout(() => {
                 $(".ldl-blue .observations .gusts").fadeOut(333, 'linear', function(){
@@ -346,7 +346,7 @@ function blueLDLObs(){
         },
         visibility = function(){
             $(".ldl-blue .observations .visibility").fadeIn(0);
-            $(".ldl-blue .visibility .info").html(`${weatherInfo.currentConditions.visibility}<span>MI</span>`);
+            $(".ldl-blue .visibility .info").html(`${weatherInfo.currentConditions.visibility}<span>${isMetric() ? "KM" : "MI"}</span>`);
             $(".ldl-blue .observations .visibility").animate({'margin-top': '3px'}, 333, 'linear');
             setTimeout(() => {
                 if(weatherInfo.monthlyPrecip == "0.00"){
@@ -362,7 +362,7 @@ function blueLDLObs(){
         precip = weatherInfo.monthlyPrecip == "0.00" ? null : function(){
             $(".ldl-blue .observations .precip").fadeIn(0);
             $(".ldl-blue .precip .obsheader").html(`${today.toLocaleDateString("en-US", {month: 'short'}).toUpperCase()} PRECIP:`);
-            $(".ldl-blue .precip .info").html(`${weatherInfo.monthlyPrecip}<span>IN</span>`);
+            $(".ldl-blue .precip .info").html(`${weatherInfo.monthlyPrecip}<span>${isMetric() ? "MM" : "IN"}</span>`);
             $(".ldl-blue .observations .precip").animate({'margin-top': '0px'}, 333, 'linear');
             setTimeout(() => {
                 $(".ldl-blue .observations .city-name").fadeOut(333, 'linear');
@@ -372,7 +372,33 @@ function blueLDLObs(){
                 })
             }, 3667);
         }
-    ]
+    ];
+
+    if (weatherInfo.eightCities && weatherInfo.eightCities.cities) {
+        weatherInfo.eightCities.cities.forEach(c => {
+            if (c.name && c.temp !== "" && c.temp !== undefined) {
+                observations.push(function() {
+                    $(".ldl-blue .observations .city-name").fadeIn(0);
+                    $(".ldl-blue .observations .tempobs").fadeIn(0);
+                    $(".ldl-blue .observations .icon").fadeIn(0);
+                    $(".ldl-blue .observations .city-name").text(c.name);
+                    $(".ldl-blue .observations .tempobs").html(`${c.temp}<span class="degree">°</span>`);
+                    $(".ldl-blue .observations .city-name").animate({'margin-top': '4px'}, 333, 'linear');
+                    $(".ldl-blue .observations .tempobs").animate({'margin-top': '7px'}, 333, 'linear');
+                    $(".ldl-blue .observations .icon").animate({'margin-top': '5px'}, 333, 'linear');
+                    getIcon($(".ldl-blue .observations .icon"), c.icon, 'ldl', undefined);
+                    setTimeout(() => {
+                        $(".ldl-blue .observations .icon").fadeOut(333, 'linear');
+                        $(".ldl-blue .observations .tempobs").fadeOut(333, 'linear', function(){
+                            $(".ldl-blue .observations .tempobs").css('margin-top', '-60px');
+                            $(".ldl-blue .observations .icon").css('margin-top', '-63px');
+                            $(".ldl-blue .observations .city-name").css('margin-top', '-60px');
+                        });
+                    }, 3667);
+                });
+            }
+        });
+    }
     var currentProgram = observations[ldlIndex % observations.length];
     if(currentProgram == null){
         ldlIndex++;

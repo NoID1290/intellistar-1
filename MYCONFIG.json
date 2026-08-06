@@ -1,0 +1,139 @@
+{
+	"fetchIntervalMinutes": 5,
+	"mainCity": {
+		"autoFind": false,
+		"displayname": "Montreal",
+		"extraname": "Montreal",
+		"type": "geocode",
+		"val": "45.503,-73.573"
+	},
+	"eightCities": {
+		"autoFind": false,
+		"cities": [
+			{
+				"displayname": "Saint-Remi",
+				"type": "geocode",
+				"val": "45.261,-73.618"
+			},
+			{
+				"displayname": "Sherbrooke",
+				"type": "geocode",
+				"val": "45.401,-71.890"
+			},
+			{
+				"displayname": "Trois-Rivieres",
+				"type": "geocode",
+				"val": "46.342,-72.542"
+			},
+			{
+				"displayname": "Drummondville",
+				"type": "geocode",
+				"val": "45.880,-72.484"
+			},
+			{
+				"displayname": "Mont-Laurier",
+				"type": "geocode",
+				"val": "46.551,-75.501"
+			},
+			{
+				"displayname": "Quebec City",
+				"type": "geocode",
+				"val": "46.813,-71.211"
+			},
+			{
+				"displayname": "Amos",
+				"type": "geocode",
+				"val": "48.569,-78.116"
+			},
+			{
+				"displayname": "Montebello",
+				"type": "geocode",
+				"val": "45.650,-74.942"
+			}
+		]
+	},
+	"mapCities": {
+		"leftPos": -3650,
+		"topPos": 1640,
+		"zoomScale": 1.12,
+		"citiesPerSlide": 9,
+		"map": [
+			{
+				"name": "Montreal",
+				"lat": 45.503,
+				"lon": -73.573,
+				"left": 3990,
+				"top": -975
+			},
+			{
+				"name": "Saint-Remi",
+				"lat": 45.261,
+				"lon": -73.618,
+				"left": 3920,
+				"top": -900
+			},
+			{
+				"name": "Sherbrooke",
+				"lat": 45.401,
+				"lon": -71.89,
+				"left": 4370,
+				"top": -940
+			},
+			{
+				"name": "Trois-Rivieres",
+				"lat": 46.342,
+				"lon": -72.542,
+				"left": 4160,
+				"top": -1060
+			},
+			{
+				"name": "Drummondville",
+				"lat": 45.88,
+				"lon": -72.484,
+				"left": 4210,
+				"top": -990
+			},
+			{
+				"name": "Mont-Laurier",
+				"lat": 46.551,
+				"lon": -75.501,
+				"left": 3750,
+				"top": -1140
+			},
+			{
+				"name": "Quebec City",
+				"lat": 46.813,
+				"lon": -71.211,
+				"left": 4330,
+				"top": -1200
+			},
+			{
+				"name": "Amos",
+				"lat": 48.569,
+				"lon": -78.116,
+				"left": 3510,
+				"top": -1260
+			},
+			{
+				"name": "Montebello",
+				"lat": 45.65,
+				"lon": -74.942,
+				"left": 3660,
+				"top": -995
+			}
+		],
+		"autoFind": false
+	},
+	"radarCities": {
+		"local": [
+			{
+				"locationName": "",
+				"dotTopPos": "",
+				"dotLeftPos": "",
+				"nameTopMargin": "",
+				"nameLeftMargin": ""
+			}
+		],
+		"regional": []
+	}
+}

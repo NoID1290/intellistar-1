@@ -111,6 +111,21 @@ document.addEventListener('DOMContentLoaded', async () =>{
             mapSettings();
         })
 
+    // IPTV mode: auto-start without showing settings menu
+    if (window.location.search.includes('iptv')) {
+        console.log('[IPTV] Auto-start mode detected');
+        $("#settings-menu").css('visibility', 'hidden');
+        // Poll until start button is enabled (data is loaded), then auto-start
+        var iptvAutoStart = setInterval(() => {
+            var btn = document.getElementById('startbutton');
+            if (btn && btn.style.pointerEvents !== 'none' && btn.style.opacity !== '0.5') {
+                clearInterval(iptvAutoStart);
+                console.log('[IPTV] Data ready, starting forecast...');
+                startProgram();
+            }
+        }, 500);
+    }
+
 })
 
 /**
@@ -136,11 +151,22 @@ var locNameInterval, dataGrabInterval;
 var divs = ["i","ii","iii","iv","v","vi","vii","viii"]
 function setLocationText(){
     function locNaming(){
-        $('.loctext').text("Location Name: " + locationConfig.mainCity.displayname + (locationConfig.mainCity.state != null ? ", " + locationConfig.mainCity.state : (locationConfig.mainCity.stateFull != null ? ", " + locationConfig.mainCity.stateFull : ''))); 
-        $('.mainloc').text("Main Location: " + locationConfig.mainCity.displayname + (locationConfig.mainCity.state != null ? ", " + locationConfig.mainCity.state : (locationConfig.mainCity.stateFull != null ? ", " + locationConfig.mainCity.stateFull : ''))); 
-        $('.loccontainer .mainextraloc').text('Extra Name: ' + locationConfig.mainCity.extraname);
-        for(let i = 0; i < locationConfig.eightCities.cities.length; i++){
-            $(`.extracity.${divs[i]} .extrcitydisplayname`).text(locationConfig.eightCities.cities[i].displayname + (locationConfig.eightCities.cities[i].state != null ? ", " + locationConfig.eightCities.cities[i].state : (locationConfig.eightCities.cities[i].stateFull != null ? ", " + locationConfig.eightCities.cities[i].stateFull : '')))
+        if (locationConfig.mainCity) {
+            var mainName = locationConfig.mainCity.displayname || "";
+            var mainState = locationConfig.mainCity.state ? ", " + locationConfig.mainCity.state : (locationConfig.mainCity.stateFull ? ", " + locationConfig.mainCity.stateFull : '');
+            $('.loctext').text("Location Name: " + mainName + mainState); 
+            $('.mainloc').text("Main Location: " + mainName + mainState); 
+            $('.loccontainer .mainextraloc').text('Extra Name: ' + (locationConfig.mainCity.extraname || ""));
+        }
+        if (locationConfig.eightCities && locationConfig.eightCities.cities) {
+            for(let i = 0; i < locationConfig.eightCities.cities.length; i++){
+                var city = locationConfig.eightCities.cities[i];
+                if (city) {
+                    var cityName = city.displayname || "";
+                    var cityState = city.state ? ", " + city.state : (city.stateFull ? ", " + city.stateFull : '');
+                    $(`.extracity.${divs[i]} .extrcitydisplayname`).text(cityName + cityState);
+                }
+            }
         }
     }
     locNaming();
@@ -151,12 +177,13 @@ function onLocationInit(){
     console.log(locationConfig);
     setLocationText();
     setTimeout(grabData, 2500);
+    var configuredIntervalMs = (typeof getFetchIntervalMs === "function") ? getFetchIntervalMs() : 60000;
     dataGrabInterval = setInterval(() =>{
-        if(inSettings == true){
+        if(inSettings == false){
             console.log("New data grab");
             grabData();
         }
-    }, 60000);
+    }, configuredIntervalMs);
 }
 
 async function startProgram() {
@@ -225,6 +252,14 @@ function flavorPicker(time, modes) {
 }
 
 function locationSearch(id){
+    $('.extracitytext').text("Location is managed by MYCONFIG.json. Edit the file and reload to change city.");
+    $('.extracitytext').css('color', 'darkred');
+    $('.extracitytext').fadeIn(0);
+    setTimeout(() => {
+        $('.extracitytext').fadeOut(1000);
+    }, 2500);
+    return;
+
     endAlertCrawl();
     clearInterval(locNameInterval);
     clearInterval(dataGrabInterval);
@@ -313,6 +348,14 @@ function downloadConfig(){
     }, 1500);
 }
 function jsonFuncs() {
+    $('.extracitytext').text("Import is disabled. MYCONFIG.json is the single source of location settings.");
+    $('.extracitytext').css('color', 'darkred');
+    $('.extracitytext').fadeIn(0);
+    setTimeout(() => {
+        $('.extracitytext').fadeOut(1000);
+    }, 2500);
+    return;
+
   //credit: MapGuy
   const fileInput = document.getElementById('locloadconfiginput');
   const file = fileInput.files[0];
@@ -354,6 +397,14 @@ function jsonFuncs() {
   reader.readAsText(file);
 }
 function saveExtraName(){
+    $('.extracitytext').text("Extra name is managed by MYCONFIG.json. Edit the file and reload.");
+    $('.extracitytext').css('color', 'darkred');
+    $('.extracitytext').fadeIn(0);
+    setTimeout(() => {
+        $('.extracitytext').fadeOut(1000);
+    }, 2500);
+    return;
+
     if(document.getElementById('extranameinput').value == undefined || document.getElementById('extranameinput').value == ''){
         return;
     }
@@ -400,6 +451,14 @@ function saveLocationCookies(){
     }, 1000);
 }
 function loadLocationCookies(){
+    $('.extracitytext').text("Cookie location load is disabled. MYCONFIG.json controls all location data.");
+    $('.extracitytext').css('color', 'darkred');
+    $('.extracitytext').fadeIn(0)
+    setTimeout(() => {
+        $('.extracitytext').fadeOut(1000);
+    }, 2500);
+    return;
+
     if(!document.cookie){
         $('.extracitytext').text("You don't have any cookies saved!");
         $('.extracitytext').css('color', 'darkred');
@@ -465,22 +524,10 @@ function mapSettings(){
         document.getElementById("mapleftvalue").value = locationConfig.regionalMap.leftPos;
         document.getElementById("maptopvalue").value = locationConfig.regionalMap.topPos;
         if(!inMapBefore){
-            $(".map-cities").css({'left':'','top':''});
-            if(locationSettings.mapCities.autoFind == true){
-                $(".map-cities .city").each((index, element) =>{
-                    if(!locationConfig.regionalMap.map[index]){return;}
-                    // console.log(index, element);
-                    var oldLeft = Number($(element).css('left').split("px")[0]), oldTop = Number($(element).css('top').split("px")[0]);
-                    // console.log(Number($(element).css('left').split("px")[0]), Number($(element).css('top').split("px")[0]))
-                    $(element).css({
-                        'left': oldLeft + locationConfig.regionalMap.leftPos,
-                        'top': oldTop + locationConfig.regionalMap.topPos
-                    })
-                    locationConfig.regionalMap.map[index].left = oldLeft + locationConfig.regionalMap.leftPos;
-                    locationConfig.regionalMap.map[index].top = oldTop + locationConfig.regionalMap.topPos;
-                    //$(element).addClass("selected");
-                })
-            }
+            $(".map-cities").css({
+                left: locationConfig.regionalMap.leftPos + 'px',
+                top: locationConfig.regionalMap.topPos + 'px'
+            });
         }
         loadMapCityDropbox()
     });
@@ -702,13 +749,9 @@ function mapSettingsExit(){
     changeSlide('basic', 'morelocation');
     $(".map-cities .city").each((index, element) =>{
         if(!locationConfig.regionalMap.map[index]){return;}
-        if(locationSettings.mapCities.autoFind == true){
-            // console.log(index, element);
-            var oldLeft = Number($(element).css('left').split("px")[0]), oldTop = Number($(element).css('top').split("px")[0]);
-            // console.log(Number($(element).css('left').split("px")[0]), Number($(element).css('top').split("px")[0]))
-            locationConfig.regionalMap.map[index].left = oldLeft;
-            locationConfig.regionalMap.map[index].top = oldTop;
-        }
+        var oldLeft = Number($(element).css('left').split("px")[0]), oldTop = Number($(element).css('top').split("px")[0]);
+        locationConfig.regionalMap.map[index].left = oldLeft;
+        locationConfig.regionalMap.map[index].top = oldTop;
     })
     inMapBefore = true;
     locationSettings.mapCities = locationConfig.regionalMap;

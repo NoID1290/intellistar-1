@@ -74,7 +74,53 @@ var weatherInfo = {
     monthlyPrecip: "",
 }
 
+var dataRefreshState = {
+    fetchIntervalMinutes: 5,
+    lastFetchAttempt: 0,
+    lastSuccessful: {
+        forecast: null,
+        alerts: null,
+        radar: null
+    }
+};
+
+function getFetchIntervalMs() {
+    var configured = Number(locationSettings && locationSettings.fetchIntervalMinutes);
+    if (!Number.isFinite(configured) || configured <= 0) {
+        configured = 5;
+    }
+    dataRefreshState.fetchIntervalMinutes = configured;
+    return Math.round(configured * 60 * 1000);
+}
+
+function formatTimestamp(ts) {
+    if (!ts) return "--";
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function updateLastUpdatedIndicator() {
+    var forecastStamp = formatTimestamp(dataRefreshState.lastSuccessful.forecast);
+    var alertsStamp = formatTimestamp(dataRefreshState.lastSuccessful.alerts);
+    var radarStamp = formatTimestamp(dataRefreshState.lastSuccessful.radar);
+    $("#data-last-updated")
+        .text(`Weather Data Updated - Forecast ${forecastStamp} | Alerts ${alertsStamp} | Radar ${radarStamp}`)
+        .removeClass("error");
+}
+
+function markFeedSuccess(feedName) {
+    dataRefreshState.lastSuccessful[feedName] = Date.now();
+    updateLastUpdatedIndicator();
+}
+
+window.markFeedSuccess = markFeedSuccess;
+
 async function grabData() {
+    var fetchIntervalMs = getFetchIntervalMs();
+    if (dataRefreshState.lastFetchAttempt && Date.now() - dataRefreshState.lastFetchAttempt < fetchIntervalMs) {
+        return;
+    }
+    dataRefreshState.lastFetchAttempt = Date.now();
+
     $("#startbutton").css("opacity", "0.5");
     $("#startbutton").css("pointer-events", "none");
     weatherInfo.specialModes.bulletin = false;
@@ -90,6 +136,9 @@ async function grabData() {
     await grabOutdoorActivityData();
     await grabMapCityData();
     await grabAlerts();
+    if (typeof window.refreshRadarFrames === "function") {
+        await window.refreshRadarFrames();
+    }
     console.log(`Weather grab done in ${Date.now() - now}ms`);
     console.log(weatherInfo);
     setTimeout(() => {
@@ -102,13 +151,13 @@ async function grabData() {
     }, 250);
 }
 async function grabCC() {
-    $.getJSON("https://api.weather.com/v3/wx/observations/current?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&units=e&language=en-US&format=json&apiKey=" + api_key, function (data) {
+    $.getJSON("https://api.weather.com/v3/wx/observations/current?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&units=" + getUnits() + "&language=en-US&format=json&apiKey=" + api_key, function (data) {
         weatherInfo.currentConditions.cond = data.wxPhraseLong.replace("Showers in the Vicinity", "Showers Nearby").replace("/Wind", ", Windy").replace("Thunder in the Vicinity", "Thunder");
         weatherInfo.currentConditions.gusts = ((data.windGust != null || data.windGust != undefined) ? data.windGust : "None");
         weatherInfo.currentConditions.humidity = data.relativeHumidity + "%";
         weatherInfo.currentConditions.icon = data.iconCodeExtend;
         weatherInfo.currentConditions.pressure.trend = data.pressureTendencyTrend;
-        weatherInfo.currentConditions.pressure.val = data.pressureAltimeter.toFixed(2);
+        weatherInfo.currentConditions.pressure.val = data.pressureAltimeter ? (isMetric() ? (data.pressureAltimeter > 500 ? (data.pressureAltimeter / 10).toFixed(1) : data.pressureAltimeter.toFixed(1)) : data.pressureAltimeter.toFixed(2)) : "";
         weatherInfo.currentConditions.temp = data.temperature;
         weatherInfo.currentConditions.dewpoint = data.temperatureDewPoint;
         weatherInfo.currentConditions.wind = ((data.windDirectionCardinal == "CALM" || data.windSpeed == 0 || data.windDirectionCardinal == undefined) ? "Calm" : data.windDirectionCardinal + " " + data.windSpeed);
@@ -141,7 +190,7 @@ async function grabNearbyCC() {
             url += locationConfig.eightCities.cities[l].lat + "," + locationConfig.eightCities.cities[l].lon + ";"
         }
     }
-    url += "&language=en-US&units=e&format=json&apiKey=" + api_key;
+    url += "&language=en-US&units=" + getUnits() + "&format=json&apiKey=" + api_key;
 
     $.getJSON(url, function (data) {
         data.forEach((ajaxedLoc, i) => {
@@ -168,8 +217,9 @@ async function grabLocalForecast() {
     weatherInfo.dayDesc.days = [];
     weatherInfo.weekAhead.days = [];
     weatherInfo.almanac.days = [];
-    var url = "https://api.weather.com/v3/wx/forecast/daily/7day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=e&language=en-US&apiKey=" + api_key;
+    var url = "https://api.weather.com/v3/wx/forecast/daily/7day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=" + getUnits() + "&language=en-US&apiKey=" + api_key;
     $.getJSON(url, function (data) {
+        markFeedSuccess("forecast");
         var dayOfWeek = { 0: "Monday", 1: "Tuesday", 2: "Wednesday", 3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday" }
         //36 HOUR
         for (var i = (data.daypart[0].daypartName[0] === null ? 1 : 0); i < (data.daypart[0].daypartName[0] === null ? 5 : 4); i++) {
@@ -177,7 +227,7 @@ async function grabLocalForecast() {
                 name: data.daypart[0].daypartName[i]
                     .replace("Tomorrow", dayOfWeek[new Date().getHours() > 3 ? new Date().getDay() : new Date().getDay() - 1])
                     .replace(" night", " Night"),
-                desc: data.daypart[0].narrative[i].replaceAll("F. ", ". "),
+                desc: data.daypart[0].narrative[i].replaceAll("F. ", ". ").replaceAll("C. ", ". "),
                 narrQualiCode: data.daypart[0].qualifierCode[i] == null ? "" : data.daypart[0].qualifierCode[i].replace("Q",""),
                 iconCode: data.daypart[0].iconCodeExtend[i],
                 cond: { name: codetoFcst[data.daypart[0].iconCodeExtend[i]].mov, time: data.daypart[0].daypartName[i].endsWith("night") ? "_night" : "_day" }
@@ -228,15 +278,12 @@ async function grabLocalForecast() {
         weatherInfo.almanac.days.push({ day: "", sunrise: "", sunset: "" });
         weatherInfo.almanac.days.push({ day: "", sunrise: "", sunset: "" });
     })
-    //console.log(weatherInfo.dayDesc);
-    //console.log(weatherInfo.weekAhead);
 }
-//taken from joe's weatherstar jr sim
 function grabMonthlyPrecip() {
-    var url = "https://api.weather.com/v1/geocode/" + locationConfig.mainCity.lat + "/" + locationConfig.mainCity.lon + "/observations/current.json?language=en-US&units=e&apiKey=" + api_key;
+    var url = "https://api.weather.com/v1/geocode/" + locationConfig.mainCity.lat + "/" + locationConfig.mainCity.lon + "/observations/current.json?language=en-US&units=" + getUnits() + "&apiKey=" + api_key;
     $.getJSON(url, function (data) {
         try {
-            weatherInfo.monthlyPrecip = data.observation.imperial.precip_mtd.toFixed(2)
+            weatherInfo.monthlyPrecip = isMetric() ? data.observation.metric.precip_mtd.toFixed(1) : data.observation.imperial.precip_mtd.toFixed(2);
         } catch (error) {
             weatherInfo.monthlyPrecip = ""
         }
@@ -268,21 +315,38 @@ async function grabAlmanac() {
     var date = new Date();
     date.setDate(date.getDate() - 1);
     var yidx = new Date().getHours() >= 15 ? 1 : 0;
-    $.getJSON(`https://api.weather.com/v3/aggcommon/v3-wx-conditions-historical-dailysummary-30day;v3-wx-almanac-daily-5day?geocode=${locationConfig.mainCity.lat},${locationConfig.mainCity.lon}&language=en-US&format=json&units=e&startDay=${date.getDate()}&startMonth=${date.getMonth() + 1}&apiKey=${api_key}`, function (data) {
-        if(data["v3-wx-almanac-daily-5day"] == null){
-            weatherInfo.almanac.noReport = true;
-            return;
-        }
+    $.getJSON(`https://api.weather.com/v3/aggcommon/v3-wx-conditions-historical-dailysummary-30day;v3-wx-almanac-daily-5day?geocode=${locationConfig.mainCity.lat},${locationConfig.mainCity.lon}&language=en-US&format=json&units=${getUnits()}&startDay=${date.getDate()}&startMonth=${date.getMonth() + 1}&apiKey=${api_key}`, function (data) {
         weatherInfo.almanac.stationname = locationConfig.mainCity.displayname.toUpperCase();
-        weatherInfo.almanac.average.high = data["v3-wx-almanac-daily-5day"].temperatureAverageMax[1];
-        weatherInfo.almanac.average.low = data["v3-wx-almanac-daily-5day"].temperatureAverageMin[1];
-        weatherInfo.almanac.record.high = data["v3-wx-almanac-daily-5day"].temperatureRecordMax[1];
-        weatherInfo.almanac.record.recordYearHigh = data["v3-wx-almanac-daily-5day"].almanacRecordYearMax[1];
-        weatherInfo.almanac.record.low = data["v3-wx-almanac-daily-5day"].temperatureRecordMin[1];
-        weatherInfo.almanac.record.recordYearLow = data["v3-wx-almanac-daily-5day"].almanacRecordYearMin[1];
-        weatherInfo.almanac.yesterday.high = data["v3-wx-conditions-historical-dailysummary-30day"].temperatureMax[data["v3-wx-conditions-historical-dailysummary-30day"].temperatureMax.length - 1 - yidx]
-        weatherInfo.almanac.yesterday.low = data["v3-wx-conditions-historical-dailysummary-30day"].temperatureMin[data["v3-wx-conditions-historical-dailysummary-30day"].temperatureMin.length - 1 - yidx]
-    })
+        var hist = data["v3-wx-conditions-historical-dailysummary-30day"];
+        if (hist && hist.temperatureMax && hist.temperatureMax.length > 1) {
+            var yHigh = hist.temperatureMax[1 - yidx] ?? hist.temperatureMax[1];
+            var yLow = hist.temperatureMin[1 - yidx] ?? hist.temperatureMin[1];
+            weatherInfo.almanac.yesterday.high = yHigh !== null && yHigh !== undefined ? Math.round(yHigh) : "";
+            weatherInfo.almanac.yesterday.low = yLow !== null && yLow !== undefined ? Math.round(yLow) : "";
+        }
+
+        if (data["v3-wx-almanac-daily-5day"]) {
+            weatherInfo.almanac.average.high = Math.round(data["v3-wx-almanac-daily-5day"].temperatureAverageMax[1]);
+            weatherInfo.almanac.average.low = Math.round(data["v3-wx-almanac-daily-5day"].temperatureAverageMin[1]);
+            weatherInfo.almanac.record.high = Math.round(data["v3-wx-almanac-daily-5day"].temperatureRecordMax[1]);
+            weatherInfo.almanac.record.recordYearHigh = data["v3-wx-almanac-daily-5day"].almanacRecordYearMax[1];
+            weatherInfo.almanac.record.low = Math.round(data["v3-wx-almanac-daily-5day"].temperatureRecordMin[1]);
+            weatherInfo.almanac.record.recordYearLow = data["v3-wx-almanac-daily-5day"].almanacRecordYearMin[1];
+        } else if (hist && hist.temperatureMax) {
+            var validHighs = hist.temperatureMax.filter(v => v !== null && v !== undefined);
+            var validLows = hist.temperatureMin.filter(v => v !== null && v !== undefined);
+            if (validHighs.length > 0) {
+                weatherInfo.almanac.average.high = Math.round(validHighs.reduce((a, b) => a + b, 0) / validHighs.length);
+                weatherInfo.almanac.record.high = Math.round(Math.max(...validHighs));
+                weatherInfo.almanac.record.recordYearHigh = "N/A";
+            }
+            if (validLows.length > 0) {
+                weatherInfo.almanac.average.low = Math.round(validLows.reduce((a, b) => a + b, 0) / validLows.length);
+                weatherInfo.almanac.record.low = Math.round(Math.min(...validLows));
+                weatherInfo.almanac.record.recordYearLow = "N/A";
+            }
+        }
+    });
 }
 
 async function grabDaypartForecast() {
@@ -290,7 +354,7 @@ async function grabDaypartForecast() {
     var dpHours = [];
     var dayOfWeek = {
         0: ["SUNDAY", "SUN NIGHT/MON", "MONDAY"], 1: ["MONDAY", "MON NIGHT/TUE", "TUESDAY"], 2: ["TUESDAY", "TUE NIGHT/WED", "WEDNESDAY"], 3: ["WEDNESDAY", "WED NIGHT/THU", "THURSDAY"],
-        4: ["THURSDAY", "THU NIGHT/FRI", "FRIDAY"], 5: ["FRIDAY", "FRI NIGHT/SAT"], 6: ["SATURDAY", "SAT NIGHT/SUN", "SUNDAY"]
+        4: ["THURSDAY", "THU NIGHT/FRI", "FRIDAY"], 5: ["FRIDAY", "FRI NIGHT/SAT", "SATURDAY"], 6: ["SATURDAY", "SAT NIGHT/SUN", "SUNDAY"]
     };
     var dpCurrent = dateFns.getHours(new Date())
     if (dpCurrent < 5) {
@@ -309,7 +373,7 @@ async function grabDaypartForecast() {
         weatherInfo.daypartForecast.dayName = dayOfWeek[new Date().getDay()][2];
         dpHours = [6, 12, 15, 17];
     }
-    var url = "https://api.weather.com/v3/wx/forecast/hourly/2day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=e&language=en-US&apiKey=" + api_key;
+    var url = "https://api.weather.com/v3/wx/forecast/hourly/2day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=" + getUnits() + "&language=en-US&apiKey=" + api_key;
     $.getJSON(url, function (data) {
         // console.log(dateFns.getHours(data.validTimeLocal[0]));
         // console.log(data.precipChance[0]);
@@ -338,11 +402,12 @@ async function grabDaypartForecast() {
 }
 async function grabMapCityData(){
     weatherInfo.map.mapCities = [];
+    if (!locationConfig.regionalMap.map || locationConfig.regionalMap.map.length === 0) return;
     var url = 'https://api.weather.com/v3/aggcommon/v3-wx-observations-current;v3-wx-forecast-daily-3day?geocodes='
     for(let i = 0; i < locationConfig.regionalMap.map.length; i++){
         url = url + `${locationConfig.regionalMap.map[i].lat},${locationConfig.regionalMap.map[i].lon};`
     }
-    url += "&language=en-US&units=e&format=json&apiKey=" + api_key;
+    url += "&language=en-US&units=" + getUnits() + "&format=json&apiKey=" + api_key;
     var midx = 0;
     $.getJSON(url, function(data){
         midx = data[0]["v3-wx-forecast-daily-3day"].daypart[0].temperature[0] == null ? 1 : 0;
@@ -380,6 +445,7 @@ async function grabAlerts() {
     weatherInfo.bulletin.crawlAlert.enabled = false;
     weatherInfo.specialModes.bulletin = false
     $.getJSON(`https://api.weather.com/v3/alerts/headlines?geocode=${locationConfig.mainCity.lat},${locationConfig.mainCity.lon}&format=json&language=en-US&apiKey=${api_key}`, function (data) {
+        markFeedSuccess("alerts");
         if (!data) {
             weatherInfo.bulletin.enabled = false;
             weatherInfo.bulletin.crawlAlert.enabled = false;
@@ -501,7 +567,7 @@ async function grabOutdoorActivityData(){
         }
         return 9;
     }
-    var url = "https://api.weather.com/v3/wx/forecast/hourly/1day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=e&language=en-US&apiKey=" + api_key;
+    var url = "https://api.weather.com/v3/wx/forecast/hourly/1day?geocode=" + locationConfig.mainCity.lat + "," + locationConfig.mainCity.lon + "&format=json&units=" + getUnits() + "&language=en-US&apiKey=" + api_key;
     $.getJSON(url, function(data){
         try {
             for(let i = 0; i < data.validTimeLocal.length; i++){

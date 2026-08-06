@@ -679,8 +679,21 @@ var codetoFcst = {
 var warningSettings = {
 		"Tsunami Warning": {priority:1, severe:false, color: 'red', included:true, marine:false},
 		"Tornado Warning": {priority:2, severe:true, color: 'red', included:true, marine:false},
+		"Alerte de tornade": {priority:2, severe:true, color: 'red', included:true, marine:false},
 		"Extreme Wind Warning": {priority:3, severe:false, color: 'red', included:false, marine:false},
 		"Severe Thunderstorm Warning": {priority:4, severe:true, color: 'red', included:true, marine:false},
+		"Alerte d'orage violent": {priority:4, severe:true, color: 'red', included:true, marine:false},
+		"Alerte d’orage violent": {priority:4, severe:true, color: 'red', included:true, marine:false},
+		"Freezing Rain Warning": {priority:24, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de pluie verglacante": {priority:24, severe:false, color: 'orange', included:true, marine:false},
+		"Wind Warning": {priority:26, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de vent": {priority:26, severe:false, color: 'orange', included:true, marine:false},
+		"Heat Warning": {priority:42, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de chaleur": {priority:42, severe:false, color: 'orange', included:true, marine:false},
+		"Rainfall Warning": {priority:37, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de pluie": {priority:37, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de blizzard": {priority:22, severe:false, color: 'orange', included:true, marine:false},
+		"Alerte de tempête hivernale": {priority:25, severe:false, color: 'orange', included:true, marine:false},
 		"Flash Flood Warning": {priority:5, severe:true, color: 'red', included:true, marine:false, narration:'FFS007A'},
 		"Flash Flood Statement": {priority:6, severe:false, color: 'orange', included:true, marine:false},
 		"Severe Weather Statement":	{priority:7, severe:false, color: 'orange', included:true, marine:false},
@@ -1050,12 +1063,25 @@ function distanceByDegrees(c1, c2) {
 }
 
 function centerMap(idx, autoFind) {
+    var zoomScale = Number(locationSettings && locationSettings.mapCities && locationSettings.mapCities.zoomScale);
+    if (!Number.isFinite(zoomScale) || zoomScale <= 0) {
+        zoomScale = 1;
+    }
+
+    $(".map-regional, .map-cities").css({
+        "transform-origin": "0 0",
+        transform: `scale(${zoomScale})`
+    });
+
     if(autoFind == false){
         $(".map-regional").css({
             left: locationConfig.regionalMap.leftPos + "px",
             top: locationConfig.regionalMap.topPos + "px"
         });
-        $(".map-cities").css({left: '', top: ''});
+        $(".map-cities").css({
+            left: locationConfig.regionalMap.leftPos + "px",
+            top: locationConfig.regionalMap.topPos + "px"
+        });
     }else{
         var lft = 720, tp = 430;
         if (regionalMapCities[idx].type == 'pacific') {
