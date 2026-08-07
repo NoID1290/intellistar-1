@@ -51,6 +51,8 @@ STREAM_BROWSER_PATH=/usr/bin/chromium-browser npm run start-iptv
 
 `STREAM_BROWSER_PATH` may also be set to `chromium-browser` or `chromium` if the browser is already on your `PATH`.
 
+Linux ARM hosts now default to `STREAM_CAPTURE_MODE=screenshot` for IPTV because some Chromium builds return black video through the CDP screencast path. If your Pi renders correctly with screencast and you want the higher-performance path, you can opt back in with `STREAM_CAPTURE_MODE=screencast npm run start-iptv`.
+
 ## Alert Test Triggers
 
 You can now force alert tests without waiting for live data, including Quebec En Alerte-style government/public safety alerts.

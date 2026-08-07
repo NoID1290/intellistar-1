@@ -17,8 +17,10 @@ module.exports = {
   screenshotQuality: 80,
   screenshotOptimizeForSpeed: true,
 
-  // Capture mode: "screencast" (CDP frame stream) or "screenshot" (legacy loop)
-  captureMode: process.env.STREAM_CAPTURE_MODE || "screencast",
+  // Capture mode: "screencast" (CDP frame stream) or "screenshot" (legacy loop).
+  // Linux ARM browsers have shown black-frame issues with CDP screencast, so
+  // default those hosts to the more compatible screenshot path.
+  captureMode: process.env.STREAM_CAPTURE_MODE || ((process.platform === 'linux' && (process.arch === 'arm' || process.arch === 'arm64')) ? "screenshot" : "screencast"),
   maxCaptureQueue: 2,
 
   // Encoding Quality Settings

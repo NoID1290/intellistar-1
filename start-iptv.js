@@ -196,6 +196,7 @@ async function startStreaming() {
   const targetUrl = `http://127.0.0.1:${config.port}?iptv`;
   const browserLaunchOptions = buildBrowserLaunchOptions(captureWidth, captureHeight);
   console.log(`[IPTV] Launching Headless Renderer target: ${targetUrl}`);
+  console.log(`[IPTV] Capture mode: ${config.captureMode}`);
 
   if (config.outputMode === 'hls') {
     const hlsDir = path.resolve(__dirname, config.hlsDirectory);
@@ -342,13 +343,16 @@ async function startStreaming() {
   const page = await browser.newPage();
   await page.goto(targetUrl, { waitUntil: 'networkidle2' });
 
-  // Wait for IPTV auto-start to kick in (settings menu hidden, forecast running)
+  // Wait for IPTV auto-start to kick in and for the startup black overlay to clear.
   console.log('[IPTV] Waiting for forecast to start...');
   await page.waitForFunction(() => {
     const menu = document.getElementById('settings-menu');
-    return menu && (menu.style.display === 'none' || getComputedStyle(menu).display === 'none');
+    const blackscreen = document.getElementById('blackscreen');
+    const menuHidden = menu && (menu.style.display === 'none' || getComputedStyle(menu).display === 'none');
+    const overlayCleared = blackscreen && getComputedStyle(blackscreen).display === 'none';
+    return menuHidden && overlayCleared;
   }, { timeout: 60000 });
-  // Small buffer to let the first slide render
+  // Small buffer to let the first visible slide render before capture begins.
   await new Promise(r => setTimeout(r, 2000));
 
   console.log('[IPTV] Live capture started. Press Ctrl+C to stop.');
