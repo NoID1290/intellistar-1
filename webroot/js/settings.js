@@ -255,6 +255,7 @@ async function startProgram() {
     $("#settings-menu").fadeOut(0);
     $("#blackscreen").fadeIn(0);
     await createMaps();
+    slideFlavor = flavorPicker(slideSettings.flavor, {bulletin: weatherInfo.specialModes.bulletin, precip: weatherInfo.specialModes.precip});
     setTimeout(() => {
         audioPlayer.startPlaying(audioPlayer.playlist, true);
     }, appearanceSettings.startupTime - 500);
@@ -304,6 +305,20 @@ function flavorChanger(flv){
  * @returns 
  */
 function flavorPicker(time, modes) {
+    function filterUnsupportedSlides(order) {
+        if (!Array.isArray(order)) {
+            return [];
+        }
+
+        if (window.__iptvMapsAvailable !== false) {
+            return order;
+        }
+
+        var disabledSlides = new Set(["mapCurrent", "mapForecast", "radarDoppler", "localDoppler", "mapTest"]);
+        console.warn('[IPTV] Skipping map and radar slides because WebGL maps are unavailable.');
+        return order.filter(slide => slide && !disabledSlides.has(slide.function));
+    }
+
     function normalizeToLocalDoppler(order) {
         if (!Array.isArray(order)) {
             return [];
@@ -340,9 +355,10 @@ function flavorPicker(time, modes) {
     }
 
     if(slideSettings.auto == false){
+        var manualOrder = filterUnsupportedSlides(normalizeToLocalDoppler(slideSettings.order));
         return {
             ...slideSettings,
-            order: normalizeToLocalDoppler(slideSettings.order)
+            order: manualOrder
         };
     }
     if(time == '') time = '120';
@@ -351,9 +367,10 @@ function flavorPicker(time, modes) {
 
     var usableFlavors = slideFlavors[`${time}sec`].filter(f => f.bulletin === modes.bulletin && f.precip === modes.precip);
     var flavor = usableFlavors[Math.floor(Math.random() * usableFlavors.length)];
+    var filteredOrder = filterUnsupportedSlides(normalizeToLocalDoppler(flavor.order));
     return {
         ...flavor,
-        order: normalizeToLocalDoppler(flavor.order)
+        order: filteredOrder
     };
 }
 

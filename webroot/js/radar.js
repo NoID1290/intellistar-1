@@ -4,6 +4,15 @@ var regradar, locradar, radarsat,
   regtimestamps, loctimestamps, sattimestamps,
   radarAnimation, animationInterval;
 
+window.__iptvMapsAvailable = true;
+
+function setMapsAvailability(available, reason) {
+  window.__iptvMapsAvailable = available;
+  if (!available && reason) {
+    console.warn(`[IPTV] ${reason}`);
+  }
+}
+
 var mapStyle = {
     version: 8,
     sources: {
@@ -48,65 +57,78 @@ async function createMaps() {
   ];
   var regionalMapStyle = mapStyle;
   var localMapStyle = buildLocalRadarStyle(mapStyle);
-  regradar = new maplibregl.Map({
-    container: "regradar",
-    style: regionalMapStyle,
-    zoom: 7.7,
-    center: radarCoords
-  });
+  try {
+    regradar = new maplibregl.Map({
+      container: "regradar",
+      style: regionalMapStyle,
+      zoom: 7.7,
+      center: radarCoords
+    });
 
-  regmap = new maplibregl.Map({
-    container: "regmap",
-    style: regionalMapStyle,
-    zoom: 7.7,
-    center: radarCoords
-  });
+    regmap = new maplibregl.Map({
+      container: "regmap",
+      style: regionalMapStyle,
+      zoom: 7.7,
+      center: radarCoords
+    });
 
-  regoutlines = new maplibregl.Map({
-    container: "regoutlines",
-    style: regionalMapStyle,
-    zoom: 7.7,
-    center: radarCoords
-  });
+    regoutlines = new maplibregl.Map({
+      container: "regoutlines",
+      style: regionalMapStyle,
+      zoom: 7.7,
+      center: radarCoords
+    });
 
-  regoutlinestrans = new maplibregl.Map({
-    container: "regoutlinestrans",
-    style: regionalMapStyle,
-    zoom: 7.7,
-    center: radarCoords
-  });
+    regoutlinestrans = new maplibregl.Map({
+      container: "regoutlinestrans",
+      style: regionalMapStyle,
+      zoom: 7.7,
+      center: radarCoords
+    });
 
-  locradar = new maplibregl.Map({
-    container: "locradar",
-    style: localMapStyle,
-    zoom: 8.65,
-    center: radarCoords
-  });
+    locradar = new maplibregl.Map({
+      container: "locradar",
+      style: localMapStyle,
+      zoom: 8.65,
+      center: radarCoords
+    });
 
-  locmap = new maplibregl.Map({
-    container: "locmap",
-    style: localMapStyle,
-    zoom: 8.65,
-    center: radarCoords
-  });
+    locmap = new maplibregl.Map({
+      container: "locmap",
+      style: localMapStyle,
+      zoom: 8.65,
+      center: radarCoords
+    });
 
-  locoutlines = new maplibregl.Map({
-    container: "locoutlines",
-    style: localMapStyle,
-    zoom: 8.65,
-    center: radarCoords
-  });
+    locoutlines = new maplibregl.Map({
+      container: "locoutlines",
+      style: localMapStyle,
+      zoom: 8.65,
+      center: radarCoords
+    });
 
-  locoutlinestrans = new maplibregl.Map({
-    container: "locoutlinestrans",
-    style: localMapStyle,
-    zoom: 8.65,
-    center: radarCoords
-  });
+    locoutlinestrans = new maplibregl.Map({
+      container: "locoutlinestrans",
+      style: localMapStyle,
+      zoom: 8.65,
+      center: radarCoords
+    });
 
-  setTimeout(async () => {
-    await preloadRadars();
-  }, 1000);
+    setMapsAvailability(true);
+    setTimeout(async () => {
+      await preloadRadars();
+    }, 1000);
+  } catch (error) {
+    regradar = null;
+    regmap = null;
+    regoutlines = null;
+    regoutlinestrans = null;
+    locradar = null;
+    locmap = null;
+    locoutlines = null;
+    locoutlinestrans = null;
+    setMapsAvailability(false, `Map rendering disabled: ${error.message}`);
+  }
 }
 
 async function fetchRadarTimestamps(map, frameCount) {
