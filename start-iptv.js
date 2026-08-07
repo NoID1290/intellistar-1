@@ -158,6 +158,96 @@ function buildBrowserLaunchOptions(captureWidth, captureHeight) {
   };
 }
 
+function attachPageDiagnostics(page) {
+  page.on('console', (msg) => {
+    const text = msg.text();
+    if (!text) return;
+
+    if (msg.type() === 'error') {
+      console.error(`[Page Error] ${text}`);
+      return;
+    }
+
+    if (/\[IPTV\]|\[Config\]|Weather grab done|Location Error|Failed to load|Auto-start mode detected|Data ready, starting forecast/i.test(text)) {
+      console.log(`[Page] ${text}`);
+    }
+  });
+
+  page.on('pageerror', (err) => {
+    console.error(`[Page Crash] ${err.message}`);
+  });
+
+  page.on('requestfailed', (request) => {
+    const failure = request.failure();
+    const url = request.url();
+    if (/api\.weather\.com|\/api\/config/i.test(url)) {
+      console.error(`[Page Request Failed] ${request.method()} ${url} :: ${failure ? failure.errorText : 'unknown error'}`);
+    }
+  });
+}
+
+async function getPageStartupState(page) {
+  return page.evaluate(() => {
+    const menu = document.getElementById('settings-menu');
+    const blackscreen = document.getElementById('blackscreen');
+    const startButton = document.getElementById('startbutton');
+    const getState = (el) => {
+      if (!el) return null;
+      const style = getComputedStyle(el);
+      return {
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+      };
+    };
+
+    const visibleSlides = Array.from(document.querySelectorAll('.slides > div'))
+      .filter((el) => {
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || '1') > 0;
+      })
+      .map((el) => el.className);
+
+    return {
+      inSettings: typeof window.inSettings === 'undefined' ? null : window.inSettings,
+      startButton: startButton ? {
+        pointerEvents: startButton.style.pointerEvents,
+        opacity: startButton.style.opacity,
+        disabled: startButton.disabled === true,
+      } : null,
+      menu: getState(menu),
+      blackscreen: getState(blackscreen),
+      visibleSlides,
+      locationText: document.querySelector('.loctext') ? document.querySelector('.loctext').textContent : '',
+      dataUpdatedText: document.querySelector('.data-updated') ? document.querySelector('.data-updated').textContent : '',
+      title: document.title,
+    };
+  });
+}
+
+async function waitForForecastReady(page, timeoutMs) {
+  try {
+    await page.waitForFunction(() => {
+      const blackscreen = document.getElementById('blackscreen');
+      const overlayHidden = !blackscreen || (() => {
+        const style = getComputedStyle(blackscreen);
+        return style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0;
+      })();
+
+      const visibleSlide = Array.from(document.querySelectorAll('.slides > div')).some((el) => {
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || '1') > 0;
+      });
+
+      return overlayHidden && visibleSlide;
+    }, { timeout: timeoutMs });
+  } catch (err) {
+    const startupState = await getPageStartupState(page).catch(() => null);
+    const detail = startupState ? ` Startup state: ${JSON.stringify(startupState)}` : '';
+    throw new Error(`Timed out waiting for visible forecast content.${detail}`);
+  }
+}
+
 async function isServerRunning(port) {
   return new Promise((resolve) => {
     const req = http.get(`http://127.0.0.1:${port}`, (res) => {
@@ -341,17 +431,12 @@ async function startStreaming() {
   const browser = await puppeteer.launch(browserLaunchOptions);
 
   const page = await browser.newPage();
+  attachPageDiagnostics(page);
   await page.goto(targetUrl, { waitUntil: 'networkidle2' });
 
-  // Wait for IPTV auto-start to kick in and for the startup black overlay to clear.
+  // Wait for the first visible forecast slide instead of inferring readiness from menu state.
   console.log('[IPTV] Waiting for forecast to start...');
-  await page.waitForFunction(() => {
-    const menu = document.getElementById('settings-menu');
-    const blackscreen = document.getElementById('blackscreen');
-    const menuHidden = menu && (menu.style.display === 'none' || getComputedStyle(menu).display === 'none');
-    const overlayCleared = blackscreen && getComputedStyle(blackscreen).display === 'none';
-    return menuHidden && overlayCleared;
-  }, { timeout: 60000 });
+  await waitForForecastReady(page, 120000);
   // Small buffer to let the first visible slide render before capture begins.
   await new Promise(r => setTimeout(r, 2000));
 
