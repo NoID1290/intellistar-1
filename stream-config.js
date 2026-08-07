@@ -34,9 +34,11 @@ module.exports = {
   // libx264 preset override. Defaults to "superfast" on ARM and "ultrafast" elsewhere for minimal latency.
   x264Preset: process.env.STREAM_X264_PRESET || (isArm ? "superfast" : "ultrafast"),
 
-  // Audio mode: "file", "system", or "silent"
-  // "file" uses audioFile, "system" uses ffmpeg dshow device on Windows.
-  audioMode: process.env.STREAM_AUDIO_MODE || "file",
+  // Audio mode: "browser", "file", "system", or "silent"
+  // "browser" (DEFAULT): Captures live browser WebAudio (music + vocal local narrations + alert sound effects).
+  // "file": Uses static audioFile.
+  // "system": Captures DirectShow (Windows) or ALSA/Pulse (Linux) system audio loopback.
+  audioMode: process.env.STREAM_AUDIO_MODE || "browser",
   audioFile: process.env.STREAM_AUDIO_FILE || "./webroot/music/Track 1.mp3",
   audioDevice: process.env.STREAM_AUDIO_DEVICE || "virtual-audio-capturer",
 

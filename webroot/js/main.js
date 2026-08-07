@@ -8,20 +8,25 @@ $(function(){
 	});
 
 	function scaleWindow() {
-		var scale, windowAspect;
+		var scaleX, scaleY, windowAspect;
+		var targetAspect = 16 / 9;
+		var baseAspect = mainWidth / mainHeight; // 1620 / 1080 = 1.5
+		var stretchX = targetAspect / baseAspect; // 32 / 27 (~1.185185)
 
 		windowAspect = $window.width() / $window.height();
-		if (windowAspect>=(3/2)) {
-			scale = $window.height() / mainHeight;
+		if (windowAspect >= targetAspect) {
+			scaleY = $window.height() / mainHeight;
+			scaleX = scaleY * stretchX;
 		} else {
-			scale = $window.width() / mainWidth;
+			scaleX = $window.width() / (mainWidth * stretchX);
+			scaleY = scaleX / stretchX;
 		}
 
 		$main.css({
-			transform: "translate(-50%, -50%) " + "scale(" + scale + ")"
+			transform: "translate(-50%, -50%) " + "scale(" + scaleX + ", " + scaleY + ")"
 		});
 		$(".container").css({
-			transform: "translate(-50%, -50%) " + "scale(" + scale + ")"
+			transform: "translate(-50%, -50%) " + "scale(" + scaleX + ", " + scaleY + ")"
 		});
 	}
 	scaleWindow();

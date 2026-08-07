@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const { spawn, spawnSync } = require('child_process');
+const { PassThrough } = require('stream');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -16,6 +17,22 @@ function getAvailableVideoEncoders() {
     return output;
   } catch (e) {
     return '';
+  }
+}
+
+function getWindowsDshowAudioDevices() {
+  try {
+    const result = spawnSync('ffmpeg', ['-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'], { encoding: 'utf8' });
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+    const matches = [];
+    const regex = /"([^"]+)"\s+\(audio\)/g;
+    let m;
+    while ((m = regex.exec(output)) !== null) {
+      matches.push(m[1]);
+    }
+    return matches;
+  } catch (e) {
+    return [];
   }
 }
 
@@ -317,7 +334,15 @@ async function startStreaming() {
     '-i', '-', // video input from stdin
   ];
 
-  if (config.audioMode === 'file') {
+  let audioPipe = null;
+  if (config.audioMode === 'browser') {
+    audioPipe = new PassThrough();
+    console.log('[IPTV] Audio mode: browser (live WebAudio capture)');
+    ffmpegArgs.push(
+      '-f', 'webm',
+      '-i', 'pipe:3'
+    );
+  } else if (config.audioMode === 'file') {
     const audioFilePath = path.resolve(__dirname, config.audioFile);
     if (fs.existsSync(audioFilePath)) {
       ffmpegArgs.push(
@@ -333,7 +358,23 @@ async function startStreaming() {
     }
   } else if (config.audioMode === 'system') {
     if (process.platform === 'win32') {
-      ffmpegArgs.push('-f', 'dshow', '-i', `audio=${config.audioDevice}`);
+      let audioDev = config.audioDevice;
+      const available = getWindowsDshowAudioDevices();
+      if (available.length > 0 && !available.includes(audioDev)) {
+        console.log(`[IPTV] Configured audio device "${audioDev}" not found.`);
+        // Exclude microphone devices to avoid capturing voice mics by mistake
+        const nonMics = available.filter((d) => !/mic|microphone/i.test(d));
+        const match = nonMics.find((d) => /virtual|stereo mix|wave out|cable|what u hear|stream/i.test(d));
+        if (match) {
+          console.log(`[IPTV] Auto-selected loopback audio capture device: "${match}"`);
+          audioDev = match;
+        } else {
+          console.warn(`[IPTV] Available DirectShow devices:`, available);
+          console.warn(`[IPTV] To capture live browser audio on Windows, set STREAM_AUDIO_DEVICE to your virtual audio cable or stereo mix device.`);
+        }
+      }
+      console.log(`[IPTV] Using DirectShow audio device: "${audioDev}"`);
+      ffmpegArgs.push('-f', 'dshow', '-i', `audio=${audioDev}`);
     } else {
       const linuxDevice = process.env.STREAM_AUDIO_DEVICE || config.linuxAudioDevice || 'default';
       ffmpegArgs.push('-f', config.linuxAudioBackend || 'alsa', '-i', linuxDevice);
@@ -416,7 +457,15 @@ async function startStreaming() {
   }
 
   console.log(`[IPTV] Starting FFmpeg process (${config.outputMode.toUpperCase()}, ${videoEncoder}) -> ${outputPath}`);
-  const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+  const ffmpegStdio = (config.audioMode === 'browser' && audioPipe)
+    ? ['pipe', 'pipe', 'pipe', 'pipe']
+    : ['pipe', 'pipe', 'pipe'];
+
+  const ffmpeg = spawn('ffmpeg', ffmpegArgs, { stdio: ffmpegStdio });
+
+  if (config.audioMode === 'browser' && audioPipe && ffmpeg.stdio[3]) {
+    audioPipe.pipe(ffmpeg.stdio[3]);
+  }
 
   ffmpeg.stderr.on('data', (data) => {
     const msg = data.toString();
@@ -433,6 +482,14 @@ async function startStreaming() {
 
   const page = await browser.newPage();
   attachPageDiagnostics(page);
+
+  if (config.audioMode === 'browser' && audioPipe) {
+    await page.exposeFunction('sendAudioChunk', (base64Data) => {
+      if (audioPipe && !audioPipe.destroyed) {
+        audioPipe.write(Buffer.from(base64Data, 'base64'));
+      }
+    });
+  }
   await page.goto(targetUrl, { waitUntil: 'networkidle2' });
 
   // Wait for the first visible forecast slide instead of inferring readiness from menu state.

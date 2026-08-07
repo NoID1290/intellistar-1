@@ -10,6 +10,7 @@ class AudioManager {
         }
 
         $('body').append(this.$players)
+        setupAudioCapture();
 
         if (audioSettings.enableMusic) {
             this.buildPlaylist();
@@ -161,3 +162,62 @@ class AudioManager {
 }
 
 var audioPlayer = new AudioManager();
+
+function setupAudioCapture() {
+    if (typeof window.sendAudioChunk !== 'function') return;
+    if (window._audioCaptureInitialized) return;
+    window._audioCaptureInitialized = true;
+
+    try {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtxClass) return;
+        const audioCtx = new AudioCtxClass();
+        const streamDest = audioCtx.createMediaStreamDestination();
+        const connectedElements = new WeakSet();
+
+        function connectAudioElement(el) {
+            if (!el || connectedElements.has(el)) return;
+            connectedElements.add(el);
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const source = audioCtx.createMediaElementSource(el);
+                source.connect(audioCtx.destination);
+                source.connect(streamDest);
+            } catch (e) {
+                console.warn('[IPTV Audio] Error connecting element source:', e);
+            }
+        }
+
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll('audio').forEach(connectAudioElement);
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        document.querySelectorAll('audio').forEach(connectAudioElement);
+
+        const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))
+            ? 'audio/webm;codecs=opus'
+            : ((typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) ? 'audio/webm' : '');
+
+        if (!mimeType || typeof MediaRecorder === 'undefined') return;
+
+        const mediaRecorder = new MediaRecorder(streamDest.stream, { mimeType });
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64 = reader.result.split(',')[1];
+                    if (base64 && typeof window.sendAudioChunk === 'function') {
+                        window.sendAudioChunk(base64);
+                    }
+                };
+                reader.readAsDataURL(e.data);
+            }
+        };
+        mediaRecorder.start(100);
+        console.log('[IPTV Audio] WebAudio digital stream capture initialized.');
+    } catch (err) {
+        console.error('[IPTV Audio] Setup failed:', err);
+    }
+}
