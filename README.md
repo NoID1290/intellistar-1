@@ -38,6 +38,19 @@ You're all set. Enjoy!
 
 Many thanks for using our simulator! We hope you like it.
 
+## IPTV On Linux ARM
+
+`npm run start-iptv` uses Puppeteer for the headless renderer. On Raspberry Pi and other Linux ARM hosts, the Puppeteer-managed browser cache may be incompatible with the host binary format.
+
+If IPTV fails while launching Chrome, install a system Chromium build and point the stream launcher at it:
+
+```sh
+sudo apt install chromium-browser
+STREAM_BROWSER_PATH=/usr/bin/chromium-browser npm run start-iptv
+```
+
+`STREAM_BROWSER_PATH` may also be set to `chromium-browser` or `chromium` if the browser is already on your `PATH`.
+
 ## Alert Test Triggers
 
 You can now force alert tests without waiting for live data, including Quebec En Alerte-style government/public safety alerts.

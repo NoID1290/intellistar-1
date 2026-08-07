@@ -41,6 +41,10 @@ module.exports = {
   linuxAudioBackend: process.env.STREAM_AUDIO_BACKEND || "alsa",
   linuxAudioDevice: process.env.STREAM_AUDIO_DEVICE || "default",
 
+  // Optional browser override for Puppeteer capture. Useful on Linux/ARM hosts
+  // where the bundled Chromium download is unavailable or incompatible.
+  browserExecutablePath: process.env.STREAM_BROWSER_PATH || process.env.PUPPETEER_EXECUTABLE_PATH || null,
+
   // Target Output Mode: "hls" (HTTP Live Streaming), "rtmp", or "udp"
   outputMode: process.env.STREAM_MODE || "hls",
 

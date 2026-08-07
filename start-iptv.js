@@ -43,6 +43,121 @@ function resolveVideoEncoder(preferredEncoder) {
   return 'libx264';
 }
 
+function findExecutableOnPath(command) {
+  const locator = process.platform === 'win32' ? 'where' : 'which';
+
+  try {
+    const result = spawnSync(locator, [command], { encoding: 'utf8' });
+    if (result.status !== 0) return null;
+
+    const match = `${result.stdout || ''}`
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .find(Boolean);
+
+    return match && fs.existsSync(match) ? match : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function resolveBrowserExecutablePath() {
+  const configuredPath = config.browserExecutablePath;
+  if (configuredPath) {
+    const resolvedFromPath = path.isAbsolute(configuredPath)
+      ? configuredPath
+      : (findExecutableOnPath(configuredPath) || path.resolve(configuredPath));
+
+    if (!fs.existsSync(resolvedFromPath)) {
+      throw new Error(
+        `[IPTV] Configured browser executable was not found: ${resolvedFromPath}. ` +
+        'Set STREAM_BROWSER_PATH or PUPPETEER_EXECUTABLE_PATH to a valid Chromium/Chrome binary.'
+      );
+    }
+    return resolvedFromPath;
+  }
+
+  const candidates = process.platform === 'linux'
+    ? [
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/snap/bin/chromium',
+        'chromium-browser',
+        'chromium',
+        'google-chrome',
+        'google-chrome-stable',
+      ]
+    : process.platform === 'darwin'
+      ? [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Chromium.app/Contents/MacOS/Chromium',
+          'google-chrome',
+          'chromium',
+        ]
+      : [
+          'chrome',
+          'msedge',
+        ];
+
+  for (const candidate of candidates) {
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) return candidate;
+      continue;
+    }
+
+    const resolvedCandidate = findExecutableOnPath(candidate);
+    if (resolvedCandidate) return resolvedCandidate;
+  }
+
+  if (process.platform === 'linux' && isArm) {
+    throw new Error(
+      '[IPTV] No system Chromium/Chrome binary was found on this Linux ARM host. ' +
+      'Install chromium-browser (or chromium) and retry, or set STREAM_BROWSER_PATH to the browser binary.'
+    );
+  }
+
+  return null;
+}
+
+function buildBrowserLaunchOptions(captureWidth, captureHeight) {
+  const executablePath = resolveBrowserExecutablePath();
+  if (executablePath) {
+    console.log(`[IPTV] Using browser executable: ${executablePath}`);
+  } else {
+    console.log('[IPTV] Using Puppeteer managed browser executable.');
+  }
+
+  return {
+    headless: 'new',
+    executablePath: executablePath || undefined,
+    defaultViewport: {
+      width: captureWidth,
+      height: captureHeight,
+    },
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--enable-gpu',
+      '--ignore-gpu-blocklist',
+      '--enable-accelerated-2d-canvas',
+      '--enable-gpu-rasterization',
+      '--enable-zero-copy',
+      '--autoplay-policy=no-user-gesture-required',
+      // Remove the 60fps/vsync ceiling and the throttling applied to non-visible renderers.
+      '--disable-frame-rate-limit',
+      '--disable-gpu-vsync',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling',
+      '--force-device-scale-factor=1',
+      `--window-size=${captureWidth},${captureHeight}`,
+      // Pi 5 headless needs EGL to reach the V3D GPU; ANGLE/desktop GL is unavailable.
+      ...(isArm ? ['--use-gl=egl', '--use-angle=gl'] : []),
+    ],
+  };
+}
+
 async function isServerRunning(port) {
   return new Promise((resolve) => {
     const req = http.get(`http://127.0.0.1:${port}`, (res) => {
@@ -79,6 +194,7 @@ async function startStreaming() {
   const outputHeight = config.outputHeight || captureHeight;
 
   const targetUrl = `http://127.0.0.1:${config.port}?iptv`;
+  const browserLaunchOptions = buildBrowserLaunchOptions(captureWidth, captureHeight);
   console.log(`[IPTV] Launching Headless Renderer target: ${targetUrl}`);
 
   if (config.outputMode === 'hls') {
@@ -221,34 +337,7 @@ async function startStreaming() {
     console.log(`[IPTV] FFmpeg exited with code ${code}`);
   });
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    defaultViewport: {
-      width: captureWidth,
-      height: captureHeight,
-    },
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--enable-gpu',
-      '--ignore-gpu-blocklist',
-      '--enable-accelerated-2d-canvas',
-      '--enable-gpu-rasterization',
-      '--enable-zero-copy',
-      '--autoplay-policy=no-user-gesture-required',
-      // Remove the 60fps/vsync ceiling and the throttling applied to non-visible renderers.
-      '--disable-frame-rate-limit',
-      '--disable-gpu-vsync',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling',
-      '--force-device-scale-factor=1',
-      `--window-size=${captureWidth},${captureHeight}`,
-      // Pi 5 headless needs EGL to reach the V3D GPU; ANGLE/desktop GL is unavailable.
-      ...(isArm ? ['--use-gl=egl', '--use-angle=gl'] : []),
-    ],
-  });
+  const browser = await puppeteer.launch(browserLaunchOptions);
 
   const page = await browser.newPage();
   await page.goto(targetUrl, { waitUntil: 'networkidle2' });
