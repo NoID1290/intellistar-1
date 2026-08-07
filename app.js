@@ -17,7 +17,15 @@ app.get('/api/config', (req, res) => {
     }
 });
 
-app.use(express.static(path.join(__dirname, 'webroot')));
+app.use(express.static(path.join(__dirname, 'webroot'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.m3u8') || filePath.endsWith('.ts')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 app.listen(port, '0.0.0.0', () => {
     console.log("IntelliSTAR 1 by Mist Weather Media");

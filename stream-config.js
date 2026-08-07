@@ -1,5 +1,7 @@
 // Configuration for Headless Capture and IPTV Live Streaming (FFmpeg)
 
+const isArm = process.arch === 'arm' || process.arch === 'arm64';
+
 module.exports = {
   // Server port (matches default in app.js)
   port: process.env.PORT || 7070,
@@ -29,9 +31,8 @@ module.exports = {
   // Video encoder: "auto", "h264_nvenc", "h264_qsv", "h264_amf", or "libx264"
   videoEncoder: process.env.STREAM_VIDEO_ENCODER || "auto",
 
-  // libx264 preset override. Defaults to "superfast" on ARM (Raspberry Pi 5 has
-  // no hardware H.264 encoder) and "veryfast" elsewhere.
-  x264Preset: process.env.STREAM_X264_PRESET || null,
+  // libx264 preset override. Defaults to "superfast" on ARM and "ultrafast" elsewhere for minimal latency.
+  x264Preset: process.env.STREAM_X264_PRESET || (isArm ? "superfast" : "ultrafast"),
 
   // Audio mode: "file", "system", or "silent"
   // "file" uses audioFile, "system" uses ffmpeg dshow device on Windows.
@@ -53,8 +54,8 @@ module.exports = {
   // HLS Options
   hlsDirectory: "./webroot/stream",
   hlsPlaylistName: "index.m3u8",
-  hlsSegmentTime: 2, // seconds per segment
-  hlsListSize: 12,   // number of segments kept in playlist
+  hlsSegmentTime: 1, // seconds per segment
+  hlsListSize: 6,    // number of segments kept in playlist
 
   // RTMP Output URL (used when outputMode = "rtmp")
   rtmpUrl: process.env.RTMP_URL || "rtmp://localhost/live/intellistar",

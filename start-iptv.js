@@ -357,8 +357,8 @@ async function startStreaming() {
     '-b:a', config.audioBitrate,
     '-ar', '44100',
     '-ac', '2',
-    '-g', `${config.fps * 2}`,
-    '-keyint_min', `${config.fps}`,
+    '-g', `${config.fps}`,
+    '-keyint_min', `${Math.max(1, Math.floor(config.fps / 2))}`,
     '-sc_threshold', '0',
     '-bf', '0',
     '-r', `${config.fps}`,
@@ -366,7 +366,7 @@ async function startStreaming() {
   );
 
   if (videoEncoder === 'libx264') {
-    const x264Preset = config.x264Preset || (isArm ? 'superfast' : 'veryfast');
+    const x264Preset = config.x264Preset || (isArm ? 'superfast' : 'ultrafast');
     ffmpegArgs.push(
       '-preset', x264Preset,
       '-tune', 'zerolatency',
@@ -379,7 +379,7 @@ async function startStreaming() {
       `sliced-threads=1:threads=${cpuCount}:rc-lookahead=0:sync-lookahead=0:ref=1:bframes=0:aq-mode=0:mbtree=0:scenecut=0`
     );
   } else if (videoEncoder === 'h264_nvenc') {
-    ffmpegArgs.push('-preset', 'p4', '-tune', 'll', '-rc', 'cbr', '-profile:v', 'high');
+    ffmpegArgs.push('-preset', 'p1', '-tune', 'll', '-rc', 'cbr', '-delay', '0', '-zerolatency', '1', '-profile:v', 'high');
   } else if (videoEncoder === 'h264_qsv') {
     ffmpegArgs.push('-preset', 'veryfast', '-look_ahead', '0');
   } else if (videoEncoder === 'h264_amf') {
@@ -395,15 +395,16 @@ async function startStreaming() {
 
   let outputPath = '';
   if (config.outputMode === 'hls') {
-    const hlsPath = path.resolve(__dirname, config.hlsDirectory, config.hlsPlaylistName);
-    const hlsSegmentPattern = path.resolve(__dirname, config.hlsDirectory, 'index%d.ts');
+    const hlsPath = path.resolve(__dirname, config.hlsDirectory, config.hlsPlaylistName).replace(/\\/g, '/');
+    const hlsSegmentPattern = path.resolve(__dirname, config.hlsDirectory, 'index%d.ts').replace(/\\/g, '/');
     outputPath = hlsPath;
     ffmpegArgs.push(
       '-f', 'hls',
       '-hls_time', `${config.hlsSegmentTime}`,
       '-hls_list_size', `${config.hlsListSize}`,
       '-hls_segment_filename', hlsSegmentPattern,
-      '-hls_flags', 'append_list+omit_endlist+independent_segments+program_date_time',
+      '-hls_flags', 'delete_segments+omit_endlist+independent_segments+program_date_time',
+      '-hls_allow_cache', '0',
       hlsPath
     );
   } else if (config.outputMode === 'rtmp') {
@@ -419,7 +420,7 @@ async function startStreaming() {
 
   ffmpeg.stderr.on('data', (data) => {
     const msg = data.toString();
-    if (msg.includes('Error') || msg.includes('fail')) {
+    if ((msg.includes('Error') || msg.includes('fail')) && !msg.includes('failed to delete old segment')) {
       console.error(`[FFmpeg Error] ${msg.trim()}`);
     }
   });
